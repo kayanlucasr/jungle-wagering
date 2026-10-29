@@ -106,14 +106,14 @@ describe('Stage 3 financial integrity on real PostgreSQL', () => {
     const catalog = () => owner.em.execute<Array<{ count: string }>>(`select count(*)::text as count
       from information_schema.tables where table_schema = 'wagering'`);
     expect((await catalog())[0]!.count).toBe('5');
-    await migrator.down({ migrations: ['Migration20261028000200'] });
+    await migrator.down({ migrations: ['Migration20261029000200', 'Migration20261029000100', 'Migration20261028000200'] });
     expect((await catalog())[0]!.count).toBe('0');
     await migrator.up();
     expect((await catalog())[0]!.count).toBe('5');
     const triggers = await owner.em.execute<Array<{ count: string }>>(`select count(*)::text as count
       from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'wagering' and not t.tgisinternal`);
-    expect(triggers[0]!.count).toBe('20');
+    expect(triggers[0]!.count).toBe('21');
     const ownership = await owner.em.execute<Array<{ owner: string }>>(`select distinct tableowner as owner
       from pg_tables where schemaname = 'wagering'`);
     expect(ownership).toEqual([{ owner: 'wagering_owner' }]);
@@ -239,6 +239,86 @@ describe('Stage 3 financial integrity on real PostgreSQL', () => {
     expect(result.entryCount).toBe('3');
   });
 
+  test.each(['before_insert', 'after_insert', 'after_wallet', 'after_ledger', 'during_outbox', 'before_commit'])(
+    'stage7 atomic rollback at %s includes inbox and outbox; retry is safe', async (point) => {
+      const w = await wallet(); const c = command(w); const messageId = id();
+      const fail = () => { throw new Error(`Stage7Injected:${point}`); };
+      const fault: FinancialUnitOfWork = { readSnapshot: (work) => uow.readSnapshot(work), write: (work) => uow.write(async (s) => {
+        const wrap = <T extends object>(target: T, method: keyof T, before: boolean): T => new Proxy(target, {
+          get(object, key) {
+            const original = Reflect.get(object, key);
+            if (key === method && typeof original === 'function') return async (...args: unknown[]) => {
+              if (before) fail();
+              const value = await original.apply(object, args); fail(); return value;
+            };
+            return typeof original === 'function' ? original.bind(object) : original;
+          },
+        });
+        const session: FinancialSession = { ...s,
+          transactions: ['before_insert', 'after_insert'].includes(point)
+            ? wrap(s.transactions, 'insertPending', point === 'before_insert') : s.transactions,
+          wallets: point === 'after_wallet' ? wrap(s.wallets, 'save', false) : s.wallets,
+          ledger: point === 'after_ledger' ? wrap(s.ledger, 'insert', false) : s.ledger,
+          outbox: point === 'during_outbox' ? { enqueue: async (events) => {
+            await s.outbox.enqueue(events.slice(0, 1)); fail();
+          } } : s.outbox,
+        };
+        const value = await work(session);
+        if (point === 'before_commit') fail();
+        return value;
+      }) };
+      const context = { correlationId: id(), inbox: { consumerName: 'stage7-faults', messageId, payloadHash: 'a'.repeat(64) } };
+      await expect(new FinancialService(fault).submit(c, context)).rejects.toThrow(`Stage7Injected:${point}`);
+      await assertBalance(w.walletId, '100.00', '0');
+      expect(await uow.readSnapshot((s) => s.transactions.findIdentities(c.providerId, c.externalTransactionId, c.idempotencyKey))).toHaveLength(0);
+      expect(await uow.readSnapshot((s) => s.inbox.find('stage7-faults', messageId))).toBeUndefined();
+      const count = await runtime.em.execute<Array<{ count: string }>>(`select count(*)::text as count from wagering.outbox_messages
+        where aggregate_id = ?`, [w.walletId]);
+      expect(count[0]!.count).toBe('2'); // opening events only
+      await service.submit(c, context);
+      await assertBalance(w.walletId, '90.00', '1');
+      console.log(JSON.stringify({ scenario: 'transactional_fault', point, rolledBack: true, retryBalance: '90.00' }));
+    });
+
+  test('stage7 actual connection termination before commit is queried by identity before retry', async () => {
+    const w = await wallet(); const c = command(w);
+    const dedicated = await MikroORM.init({ ...ormOptions(config), connect: true,
+      driverOptions: { connection: { application_name: 'stage7-commit-disconnect', statement_timeout: 5000 } } });
+    try {
+      const real = new PostgresFinancialUnitOfWork(dedicated);
+      const broken: FinancialUnitOfWork = { readSnapshot: (work) => real.readSnapshot(work), write: (work) => real.write(async (s) => {
+        const value = await work(s);
+        const killed = await databaseAdmin.em.execute<Array<{ killed: boolean }>>(`select pg_terminate_backend(pid) as killed
+          from pg_stat_activity where datname = ? and application_name = 'stage7-commit-disconnect' and xact_start is not null`, [name]);
+        expect(killed).toHaveLength(1); expect(killed[0]!.killed).toBe(true);
+        return value;
+      }) };
+      await expect(new FinancialService(broken).submit(c)).rejects.toBeDefined();
+      // The caller treats the result as unknown, checks persisted identity on a new
+      // connection, and only then retries. No automatic compensation is performed.
+      const persisted = await uow.readSnapshot((s) => s.transactions.findIdentities(c.providerId, c.externalTransactionId, c.idempotencyKey));
+      expect(persisted).toHaveLength(0);
+      await assertBalance(w.walletId, '100.00', '0');
+      await service.submit(c); await assertBalance(w.walletId, '90.00', '1');
+      console.log(JSON.stringify({ scenario: 'real_disconnect_before_commit', identityChecked: true, retryBalance: '90.00' }));
+    } finally { await dedicated.close(true); }
+  });
+
+  test('stage7 financial metrics count committed transitions, exclude replay/rollback, and count key conflicts', async () => {
+    const w = await wallet(); const c = command(w);
+    const local = new PostgresFinancialUnitOfWork(runtime); const financial = new FinancialService(local);
+    await financial.submit(c); await financial.submit(c);
+    await financial.submit(command(w, { money: { amount: '999.00', currency: 'BRL' } }));
+    await expect(financial.submit({ ...c, money: { amount: '1.00', currency: 'BRL' } })).rejects.toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    await expect(local.write(async () => { throw new Error('rollback'); })).rejects.toThrow('rollback');
+    const aborted: FinancialUnitOfWork = { readSnapshot: (work) => local.readSnapshot(work), write: (work) => local.write(async (s) => {
+      await work(s); throw new Error('rollback after financial writes');
+    }) };
+    await expect(new FinancialService(aborted).submit(command(w))).rejects.toThrow('rollback after financial writes');
+    expect(local.metrics.snapshot()).toMatchObject({ processed: 1, rejected: 1, idempotencyConflicts: 1, retries: 0 });
+    await assertBalance(w.walletId, '90.00', '1');
+  });
+
   test('terminal replay preserves original balance after later movements; conflicting payload/key/identity are explicit', async () => {
     const w = await wallet();
     const c = command(w);
@@ -310,6 +390,8 @@ describe('Stage 3 financial integrity on real PostgreSQL', () => {
   });
 
   test('real deadlock retries the complete Unit of Work on a fresh transaction without financial effects', async () => {
+    const priorRetries = uow.metrics.retries;
+    const priorLocks = uow.metrics.lockConflicts;
     const a = await wallet(); const b = await wallet();
     let arrivals = 0;
     let attempts = 0;
@@ -333,6 +415,8 @@ describe('Stage 3 financial integrity on real PostgreSQL', () => {
     expect(await Promise.all([contender(a.walletId, b.walletId), contender(b.walletId, a.walletId)]))
       .toEqual(['committed', 'committed']);
     expect(attempts).toBeGreaterThanOrEqual(3);
+    expect(uow.metrics.retries).toBeGreaterThan(priorRetries);
+    expect(uow.metrics.lockConflicts).toBeGreaterThan(priorLocks);
     await assertBalance(a.walletId, '100.00'); await assertBalance(b.walletId, '100.00');
   });
 
@@ -375,7 +459,9 @@ describe('Stage 3 financial integrity on real PostgreSQL', () => {
     }
     for (const table of ['inbox_messages', 'outbox_messages']) {
       const rows = await runtime.em.execute<Array<{ allowed: boolean }>>('select has_table_privilege(current_user, ?, ?) as allowed', [`wagering.${table}`, 'INSERT']);
-      expect(rows[0]!.allowed).toBe(false);
+      expect(rows[0]!.allowed).toBe(true);
+      await rejectedSql(runtime, `delete from wagering.${table}`, [], '42501');
+      await rejectedSql(runtime, `truncate wagering.${table}`, [], '42501');
     }
   });
 
@@ -572,7 +658,7 @@ describe('Stage 3 financial integrity on real PostgreSQL', () => {
     await owner.em.fork().transactional(async (em) => {
       await em.execute(`insert into wagering.outbox_messages
         (id,transaction_id,aggregate_id,event_type,event_version,payload,occurred_at)
-        values (?, ?, ?, 'WalletBalanceChanged', 1, ?::jsonb, ?)`,
+        values (?, ?, ?, 'FixtureEvent', 1, ?::jsonb, ?)`,
       [eventId, tx.transactionId, w.walletId, JSON.stringify({ amount: '10.00' }), new Date()]);
       await em.execute(`insert into wagering.inbox_messages
         (consumer_name,message_id,payload_hash,transaction_id,received_at,processed_at)
@@ -584,7 +670,7 @@ describe('Stage 3 financial integrity on real PostgreSQL', () => {
     await rejectedSql(owner, 'update wagering.outbox_messages set attempts = attempts + 1 where id = ?', [eventId]);
     await rejectedSql(owner, `insert into wagering.outbox_messages
       (id,transaction_id,aggregate_id,event_type,event_version,payload,occurred_at)
-      values (?, ?, ?, 'WalletBalanceChanged', 1, '{}'::jsonb, ?)`, [id(), tx.transactionId, w.walletId, new Date()], '23505');
+      values (?, ?, ?, 'FixtureEvent', 1, '{}'::jsonb, ?)`, [id(), tx.transactionId, w.walletId, new Date()], '23505');
     const other = await wallet();
     await rejectedSql(owner, `insert into wagering.outbox_messages
       (id,transaction_id,aggregate_id,event_type,event_version,payload,occurred_at)

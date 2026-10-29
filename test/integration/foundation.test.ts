@@ -6,6 +6,7 @@ import { loadConfig, type AppConfig } from '../../src/infrastructure/config/envi
 import { ormOptions } from '../../src/infrastructure/persistence/orm-options';
 import { SqsService } from '../../src/infrastructure/messaging/sqs.service';
 import { Migration20261028000100 } from '../../src/infrastructure/persistence/migrations/Migration20261028000100';
+import { provisionAccess } from '../../src/infrastructure/persistence/provision-access';
 
 describe('Stage 1 with real PostgreSQL and LocalStack', () => {
   let admin: MikroORM;
@@ -82,8 +83,19 @@ describe('Stage 1 with real PostgreSQL and LocalStack', () => {
     try { await sqs.checkReady(); } finally { sqs.onApplicationShutdown(); }
   });
 
-  test('serves public liveness and readiness with real dependencies', async () => {
+  test('schema-only database is not financially ready while liveness and SQS remain healthy', async () => {
+    const result = await probe();
+    expect(result.status).toBe(503);
+    expect(result.body).toMatchObject({ dependencies: { postgres: 'down', sqs: 'up' } });
+  });
+
+  test('serves public liveness and readiness with fully migrated real dependencies', async () => {
     await database.getMigrator().up();
+    await provisionAccess(database, { name: 'foundation_migrator', password: 'isolated_foundation_migration' },
+      { name: 'foundation_runtime', password: 'isolated_foundation_runtime' });
+    const owner = await MikroORM.init({ ...ormOptions(loadConfig({ ...process.env, DB_NAME: isolatedName,
+      DB_USER: 'foundation_migrator', DB_PASSWORD: 'isolated_foundation_migration' }), true), connect: true });
+    try { await owner.getMigrator().up(); } finally { await owner.close(true); }
     let app: NestExpressApplication | undefined;
     try {
       app = await createApplication(config);

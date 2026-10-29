@@ -1,0 +1,136 @@
+# Exclusive disposable project: no published ports, named volumes or Docker socket.
+x-environment: &environment
+  NODE_ENV: test
+  HOST: 0.0.0.0
+  PORT: "3000"
+  LOG_LEVEL: info
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: jungle_wagering_test_distributed
+  DB_USER: distributed_runtime
+  DB_PASSWORD: isolated_distributed_runtime
+  DB_POOL_MAX: "4"
+  DEPENDENCY_TIMEOUT_MS: "5000"
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  SQS_ENDPOINT: http://localstack:4566
+  SQS_QUEUE_NAME: wager-transactions.fifo
+  SQS_DLQ_NAME: wager-transactions-dlq.fifo
+  SQS_EVENTS_QUEUE_NAME: wager-events.fifo
+  SQS_EVENTS_DLQ_NAME: wager-events-dlq.fifo
+  SQS_MAX_RECEIVE_COUNT: "3"
+  SQS_VISIBILITY_TIMEOUT_SECONDS: "3"
+  SQS_WAIT_SECONDS: "1"
+  CONSUMER_CONCURRENCY: "2"
+  OUTBOX_POLL_MS: "100"
+  OUTBOX_LEASE_SECONDS: "12"
+  PENDING_REFERENCE_POLL_MS: "100"
+  PENDING_REFERENCE_BASE_SECONDS: "1"
+  PENDING_REFERENCE_CAP_SECONDS: "2"
+  PENDING_REFERENCE_TTL_SECONDS: "300"
+  PENDING_REFERENCE_MAX_ATTEMPTS: "100"
+  WORKER_SHUTDOWN_TIMEOUT_MS: "5000"
+
+x-application: &application
+  image: jungle-wagering-distributed-test:stage7
+  build:
+    context: .
+    target: test
+  environment: *environment
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    queues:
+      condition: service_completed_successfully
+  restart: "no"
+  init: true
+
+x-worker: &worker
+  <<: *application
+  healthcheck:
+    test: ["CMD", "bun", "test/support/distributed-worker-health.ts"]
+    interval: 3s
+    timeout: 3s
+    start_period: 15s
+    retries: 10
+
+services:
+  postgres:
+    extends:
+      file: docker-compose.test.yml
+      service: postgres
+    environment:
+      POSTGRES_DB: jungle_wagering_test_distributed
+  localstack:
+    extends:
+      file: docker-compose.test.yml
+      service: localstack
+  queues:
+    <<: *application
+    depends_on:
+      localstack:
+        condition: service_healthy
+    command: ["bun", "scripts/init-queues.ts"]
+    healthcheck:
+      disable: true
+  database-bootstrap:
+    <<: *application
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["bun", "scripts/bootstrap-database.ts"]
+    environment:
+      <<: *environment
+      ALLOW_DATABASE_BOOTSTRAP: "1"
+      ADMIN_DB_USER: jungle_test
+      ADMIN_DB_PASSWORD: isolated_test_only
+      MIGRATION_DB_USER: distributed_migrator
+      MIGRATION_DB_PASSWORD: isolated_distributed_migration
+      RUNTIME_DB_USER: distributed_runtime
+      RUNTIME_DB_PASSWORD: isolated_distributed_runtime
+  migrate:
+    <<: *application
+    depends_on:
+      database-bootstrap:
+        condition: service_completed_successfully
+    command: ["bun", "scripts/migrate.ts", "up"]
+    environment:
+      <<: *environment
+      DB_USER: distributed_migrator
+      DB_PASSWORD: isolated_distributed_migration
+  app1:
+    <<: *application
+    command: ["bun", "dist/src/main.js"]
+    healthcheck: &api-health
+      test: ["CMD", "bun", "dist/scripts/healthcheck.js"]
+      interval: 3s
+      timeout: 8s
+      retries: 15
+  app2:
+    <<: *application
+    command: ["bun", "dist/src/main.js"]
+    healthcheck: *api-health
+  app3:
+    <<: *application
+    command: ["bun", "dist/src/main.js"]
+    healthcheck: *api-health
+  consumer:
+    <<: *worker
+    command: ["bun", "test/support/distributed-worker.ts", "consumer"]
+  publisher:
+    <<: *worker
+    command: ["bun", "test/support/distributed-worker.ts", "publisher"]
+  pending-reference:
+    <<: *worker
+    command: ["bun", "test/support/distributed-worker.ts", "pending-reference"]
+  tests:
+    <<: *application
+    command: ["bun", "test/distributed/scenarios.ts"]
+    environment:
+      <<: *environment
+      DISTRIBUTED_TEST_APPROVED: "1"
+      ADMIN_DB_USER: jungle_test
+      ADMIN_DB_PASSWORD: isolated_test_only
+      MIGRATION_DB_USER: distributed_migrator
+      MIGRATION_DB_PASSWORD: isolated_distributed_migration

@@ -20,9 +20,27 @@ x-app-environment: &app-environment
   SQS_DLQ_NAME: ${SQS_DLQ_NAME:-wager-transactions-dlq.fifo}
   SQS_MAX_RECEIVE_COUNT: ${SQS_MAX_RECEIVE_COUNT:-5}
   SQS_VISIBILITY_TIMEOUT_SECONDS: ${SQS_VISIBILITY_TIMEOUT_SECONDS:-30}
+  SQS_EVENTS_QUEUE_NAME: ${SQS_EVENTS_QUEUE_NAME:-wager-events.fifo}
+  SQS_EVENTS_DLQ_NAME: ${SQS_EVENTS_DLQ_NAME:-wager-events-dlq.fifo}
+  CONSUMER_CONCURRENCY: ${CONSUMER_CONCURRENCY:-4}
+  SQS_WAIT_SECONDS: ${SQS_WAIT_SECONDS:-20}
+  MESSAGING_RETRY_BASE_SECONDS: ${MESSAGING_RETRY_BASE_SECONDS:-1}
+  MESSAGING_RETRY_CAP_SECONDS: ${MESSAGING_RETRY_CAP_SECONDS:-300}
+  WORKER_SHUTDOWN_TIMEOUT_MS: ${WORKER_SHUTDOWN_TIMEOUT_MS:-10000}
+  OUTBOX_BATCH_SIZE: ${OUTBOX_BATCH_SIZE:-10}
+  OUTBOX_LEASE_SECONDS: ${OUTBOX_LEASE_SECONDS:-30}
+  OUTBOX_MAX_ATTEMPTS: ${OUTBOX_MAX_ATTEMPTS:-20}
+  OUTBOX_POLL_MS: ${OUTBOX_POLL_MS:-1000}
+  PENDING_REFERENCE_TTL_SECONDS: ${PENDING_REFERENCE_TTL_SECONDS:-86400}
+  PENDING_REFERENCE_MAX_ATTEMPTS: ${PENDING_REFERENCE_MAX_ATTEMPTS:-20}
+  PENDING_REFERENCE_BASE_SECONDS: ${PENDING_REFERENCE_BASE_SECONDS:-1}
+  PENDING_REFERENCE_CAP_SECONDS: ${PENDING_REFERENCE_CAP_SECONDS:-300}
+  PENDING_REFERENCE_POLL_MS: ${PENDING_REFERENCE_POLL_MS:-1000}
+  PENDING_REFERENCE_BATCH_SIZE: ${PENDING_REFERENCE_BATCH_SIZE:-20}
+  PENDING_REFERENCE_IDLE_TIMEOUT_MS: ${PENDING_REFERENCE_IDLE_TIMEOUT_MS:-10000}
 
 x-application: &application
-  image: jungle-wagering:stage3
+  image: jungle-wagering:stage6
   build:
     context: .
     target: runtime
@@ -120,6 +138,46 @@ services:
         condition: service_completed_successfully
       queues:
         condition: service_completed_successfully
+    init: true
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+  consumer:
+    <<: *application
+    command: ["bun", "dist/src/workers/main.js", "consumer"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      queues:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+    init: true
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+  publisher:
+    <<: *application
+    command: ["bun", "dist/src/workers/main.js", "publisher"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      queues:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+    init: true
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+  pending-reference:
+    <<: *application
+    command: ["bun", "dist/src/workers/main.js", "pending-reference"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
     init: true
     stop_grace_period: 15s
     restart: unless-stopped

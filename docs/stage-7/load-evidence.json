@@ -1,0 +1,1184 @@
+{
+  "project": "jungle-distributed-test-1e158f6f",
+  "startedAt": "2026-10-29T21:48:42.853Z",
+  "loadOnly": true,
+  "initialInstances": [
+    {
+      "id": "11bba0ab3cb6",
+      "service": "app1",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "11bba0ab3cb6",
+      "pid": 77393,
+      "startedAt": "2026-10-29T21:48:54.964459982Z"
+    },
+    {
+      "id": "c7848c78cf25",
+      "service": "app2",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "c7848c78cf25",
+      "pid": 77492,
+      "startedAt": "2026-10-29T21:48:55.187263914Z"
+    },
+    {
+      "id": "63664a04a1f1",
+      "service": "app3",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "63664a04a1f1",
+      "pid": 77632,
+      "startedAt": "2026-10-29T21:48:55.41305509Z"
+    },
+    {
+      "id": "64d3d8a650d3",
+      "service": "consumer",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "64d3d8a650d3",
+      "pid": 77750,
+      "startedAt": "2026-10-29T21:48:55.652821432Z"
+    },
+    {
+      "id": "fb7eb2f88fe6",
+      "service": "consumer",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "fb7eb2f88fe6",
+      "pid": 77842,
+      "startedAt": "2026-10-29T21:48:55.939561416Z"
+    },
+    {
+      "id": "0f005983963d",
+      "service": "consumer",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "0f005983963d",
+      "pid": 77104,
+      "startedAt": "2026-10-29T21:48:54.317312739Z"
+    },
+    {
+      "id": "66bc862c007c",
+      "service": "pending-reference",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "66bc862c007c",
+      "pid": 77211,
+      "startedAt": "2026-10-29T21:48:54.523151221Z"
+    },
+    {
+      "id": "6b5a806790bd",
+      "service": "pending-reference",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "6b5a806790bd",
+      "pid": 77956,
+      "startedAt": "2026-10-29T21:48:56.211265182Z"
+    },
+    {
+      "id": "4f722f5f4cf7",
+      "service": "pending-reference",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "4f722f5f4cf7",
+      "pid": 78155,
+      "startedAt": "2026-10-29T21:48:56.872913257Z"
+    },
+    {
+      "id": "c94624f5fa26",
+      "service": "publisher",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "c94624f5fa26",
+      "pid": 77293,
+      "startedAt": "2026-10-29T21:48:54.752174751Z"
+    },
+    {
+      "id": "b1ea9dc92559",
+      "service": "publisher",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "b1ea9dc92559",
+      "pid": 78064,
+      "startedAt": "2026-10-29T21:48:56.523404578Z"
+    }
+  ],
+  "logValidation": {
+    "jsonRecords": 448,
+    "committedConsumerLogs": 24,
+    "publishedLogs": 171,
+    "status": "PASS"
+  },
+  "metricSnapshots": [
+    {
+      "timestamp": "2026-10-29T21:49:07.275Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "6b5a806790bd",
+      "event": "messaging_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "active": 0,
+        "attempts": 0,
+        "resolved": 0,
+        "rejected": 0,
+        "expired": 0,
+        "transientFailures": 0,
+        "processingDurationMs": 0,
+        "completedCount": 0,
+        "resolutionAgeMs": 0,
+        "meanResolutionMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:07.275Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "6b5a806790bd",
+      "event": "financial_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 92,
+        "processingDurationMs": 432.36741399999755
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:17.275Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "6b5a806790bd",
+      "event": "messaging_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "active": 0,
+        "attempts": 0,
+        "resolved": 0,
+        "rejected": 0,
+        "expired": 0,
+        "transientFailures": 0,
+        "processingDurationMs": 0,
+        "completedCount": 0,
+        "resolutionAgeMs": 0,
+        "meanResolutionMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:17.275Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "6b5a806790bd",
+      "event": "financial_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 187,
+        "processingDurationMs": 706.7309149999865
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:08.218Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "4f722f5f4cf7",
+      "event": "messaging_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "active": 0,
+        "attempts": 0,
+        "resolved": 0,
+        "rejected": 0,
+        "expired": 0,
+        "transientFailures": 0,
+        "processingDurationMs": 0,
+        "completedCount": 0,
+        "resolutionAgeMs": 0,
+        "meanResolutionMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:05.073Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "0f005983963d",
+      "event": "messaging_metrics",
+      "context": "consumer",
+      "metrics": {
+        "received": 0,
+        "processed": 0,
+        "duplicates": 0,
+        "transientFailures": 0,
+        "invalid": 0,
+        "permanentFailures": 0,
+        "dlqForwarded": 0,
+        "published": 0,
+        "publicationFailures": 0,
+        "outboxPending": 0,
+        "outboxExhausted": 0,
+        "outboxOldestAgeMs": 0,
+        "processingDurationMs": 0,
+        "processingCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:07.013Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "fb7eb2f88fe6",
+      "event": "messaging_metrics",
+      "context": "consumer",
+      "metrics": {
+        "received": 2,
+        "processed": 0,
+        "duplicates": 0,
+        "transientFailures": 0,
+        "invalid": 0,
+        "permanentFailures": 0,
+        "dlqForwarded": 0,
+        "published": 0,
+        "publicationFailures": 0,
+        "outboxPending": 0,
+        "outboxExhausted": 0,
+        "outboxOldestAgeMs": 0,
+        "processingDurationMs": 0,
+        "processingCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:05.073Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "0f005983963d",
+      "event": "financial_metrics",
+      "context": "consumer",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 0,
+        "processingDurationMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:07.013Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "fb7eb2f88fe6",
+      "event": "financial_metrics",
+      "context": "consumer",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 0,
+        "processingDurationMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:05.495Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "c94624f5fa26",
+      "event": "messaging_metrics",
+      "context": "publisher",
+      "metrics": {
+        "received": 0,
+        "processed": 0,
+        "duplicates": 0,
+        "transientFailures": 0,
+        "invalid": 0,
+        "permanentFailures": 0,
+        "dlqForwarded": 0,
+        "published": 0,
+        "publicationFailures": 0,
+        "outboxPending": 0,
+        "outboxExhausted": 0,
+        "outboxOldestAgeMs": 0,
+        "processingDurationMs": 0,
+        "processingCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:05.282Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "66bc862c007c",
+      "event": "messaging_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "active": 0,
+        "attempts": 0,
+        "resolved": 0,
+        "rejected": 0,
+        "expired": 0,
+        "transientFailures": 0,
+        "processingDurationMs": 0,
+        "completedCount": 0,
+        "resolutionAgeMs": 0,
+        "meanResolutionMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:05.283Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "66bc862c007c",
+      "event": "financial_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 92,
+        "processingDurationMs": 466.2760029999979
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:15.282Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "66bc862c007c",
+      "event": "messaging_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "active": 0,
+        "attempts": 0,
+        "resolved": 0,
+        "rejected": 0,
+        "expired": 0,
+        "transientFailures": 0,
+        "processingDurationMs": 0,
+        "completedCount": 0,
+        "resolutionAgeMs": 0,
+        "meanResolutionMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:06.592Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "64d3d8a650d3",
+      "event": "messaging_metrics",
+      "context": "consumer",
+      "metrics": {
+        "received": 0,
+        "processed": 0,
+        "duplicates": 0,
+        "transientFailures": 0,
+        "invalid": 0,
+        "permanentFailures": 0,
+        "dlqForwarded": 0,
+        "published": 0,
+        "publicationFailures": 0,
+        "outboxPending": 0,
+        "outboxExhausted": 0,
+        "outboxOldestAgeMs": 0,
+        "processingDurationMs": 0,
+        "processingCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:06.592Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "64d3d8a650d3",
+      "event": "financial_metrics",
+      "context": "consumer",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 0,
+        "processingDurationMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:05.496Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "c94624f5fa26",
+      "event": "financial_metrics",
+      "context": "publisher",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 0,
+        "processingDurationMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:08.218Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "4f722f5f4cf7",
+      "event": "financial_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 92,
+        "processingDurationMs": 431.91561400001046
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:18.218Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "4f722f5f4cf7",
+      "event": "messaging_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "active": 0,
+        "attempts": 0,
+        "resolved": 0,
+        "rejected": 0,
+        "expired": 0,
+        "transientFailures": 0,
+        "processingDurationMs": 0,
+        "completedCount": 0,
+        "resolutionAgeMs": 0,
+        "meanResolutionMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:18.218Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "4f722f5f4cf7",
+      "event": "financial_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 188,
+        "processingDurationMs": 706.6393380000063
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:15.282Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "66bc862c007c",
+      "event": "financial_metrics",
+      "context": "pending-reference",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 186,
+        "processingDurationMs": 808.0190089999967
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:17.013Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "fb7eb2f88fe6",
+      "event": "messaging_metrics",
+      "context": "consumer",
+      "metrics": {
+        "received": 8,
+        "processed": 8,
+        "duplicates": 4,
+        "transientFailures": 0,
+        "invalid": 0,
+        "permanentFailures": 0,
+        "dlqForwarded": 0,
+        "published": 0,
+        "publicationFailures": 0,
+        "outboxPending": 0,
+        "outboxExhausted": 0,
+        "outboxOldestAgeMs": 0,
+        "processingDurationMs": 915,
+        "processingCount": 8
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:17.013Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "fb7eb2f88fe6",
+      "event": "financial_metrics",
+      "context": "consumer",
+      "metrics": {
+        "processed": 4,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 8,
+        "processingDurationMs": 578.1025329999975
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:15.074Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "0f005983963d",
+      "event": "messaging_metrics",
+      "context": "consumer",
+      "metrics": {
+        "received": 7,
+        "processed": 7,
+        "duplicates": 3,
+        "transientFailures": 0,
+        "invalid": 0,
+        "permanentFailures": 0,
+        "dlqForwarded": 0,
+        "published": 0,
+        "publicationFailures": 0,
+        "outboxPending": 0,
+        "outboxExhausted": 0,
+        "outboxOldestAgeMs": 0,
+        "processingDurationMs": 890,
+        "processingCount": 7
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:16.582Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "64d3d8a650d3",
+      "event": "messaging_metrics",
+      "context": "consumer",
+      "metrics": {
+        "received": 9,
+        "processed": 9,
+        "duplicates": 5,
+        "transientFailures": 0,
+        "invalid": 0,
+        "permanentFailures": 0,
+        "dlqForwarded": 0,
+        "published": 0,
+        "publicationFailures": 0,
+        "outboxPending": 0,
+        "outboxExhausted": 0,
+        "outboxOldestAgeMs": 0,
+        "processingDurationMs": 843,
+        "processingCount": 9
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:15.074Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "0f005983963d",
+      "event": "financial_metrics",
+      "context": "consumer",
+      "metrics": {
+        "processed": 4,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 7,
+        "processingDurationMs": 599.0346819999995
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:06.387Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "c7848c78cf25",
+      "event": "http_metrics",
+      "metrics": {
+        "requests": 3,
+        "requestDurationMs": 155,
+        "reconciliationChecks": 0,
+        "reconciliationInconsistencies": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:06.388Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "c7848c78cf25",
+      "event": "financial_metrics",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 0,
+        "processingDurationMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:16.582Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "64d3d8a650d3",
+      "event": "financial_metrics",
+      "context": "consumer",
+      "metrics": {
+        "processed": 4,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 9,
+        "processingDurationMs": 608.6385470000023
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:06.101Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "11bba0ab3cb6",
+      "event": "http_metrics",
+      "metrics": {
+        "requests": 3,
+        "requestDurationMs": 143,
+        "reconciliationChecks": 0,
+        "reconciliationInconsistencies": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:06.101Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "11bba0ab3cb6",
+      "event": "financial_metrics",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 0,
+        "processingDurationMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:06.659Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "63664a04a1f1",
+      "event": "http_metrics",
+      "metrics": {
+        "requests": 15,
+        "requestDurationMs": 1223,
+        "reconciliationChecks": 0,
+        "reconciliationInconsistencies": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:06.659Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "63664a04a1f1",
+      "event": "financial_metrics",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 12,
+        "processingDurationMs": 1030.7574210000002
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:07.587Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "b1ea9dc92559",
+      "event": "messaging_metrics",
+      "context": "publisher",
+      "metrics": {
+        "received": 0,
+        "processed": 0,
+        "duplicates": 0,
+        "transientFailures": 0,
+        "invalid": 0,
+        "permanentFailures": 0,
+        "dlqForwarded": 0,
+        "published": 50,
+        "publicationFailures": 0,
+        "outboxPending": 71,
+        "outboxExhausted": 0,
+        "outboxOldestAgeMs": 882.533,
+        "processingDurationMs": 0,
+        "processingCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:07.587Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "b1ea9dc92559",
+      "event": "financial_metrics",
+      "context": "publisher",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 0,
+        "processingDurationMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:16.388Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "c7848c78cf25",
+      "event": "http_metrics",
+      "metrics": {
+        "requests": 49,
+        "requestDurationMs": 17924,
+        "reconciliationChecks": 0,
+        "reconciliationInconsistencies": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:16.388Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "c7848c78cf25",
+      "event": "financial_metrics",
+      "metrics": {
+        "processed": 9,
+        "rejected": 6,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 43,
+        "processingDurationMs": 17603.282993000008
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:16.659Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "63664a04a1f1",
+      "event": "http_metrics",
+      "metrics": {
+        "requests": 49,
+        "requestDurationMs": 16785,
+        "reconciliationChecks": 0,
+        "reconciliationInconsistencies": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:16.660Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "63664a04a1f1",
+      "event": "financial_metrics",
+      "metrics": {
+        "processed": 9,
+        "rejected": 6,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 43,
+        "processingDurationMs": 16442.630259999998
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:16.101Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "11bba0ab3cb6",
+      "event": "http_metrics",
+      "metrics": {
+        "requests": 52,
+        "requestDurationMs": 20545,
+        "reconciliationChecks": 0,
+        "reconciliationInconsistencies": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:16.102Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "11bba0ab3cb6",
+      "event": "financial_metrics",
+      "metrics": {
+        "processed": 8,
+        "rejected": 7,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 46,
+        "processingDurationMs": 20219.895759
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:17.587Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "b1ea9dc92559",
+      "event": "messaging_metrics",
+      "context": "publisher",
+      "metrics": {
+        "received": 0,
+        "processed": 0,
+        "duplicates": 0,
+        "transientFailures": 0,
+        "invalid": 0,
+        "permanentFailures": 0,
+        "dlqForwarded": 0,
+        "published": 82,
+        "publicationFailures": 0,
+        "outboxPending": 0,
+        "outboxExhausted": 0,
+        "outboxOldestAgeMs": 0,
+        "processingDurationMs": 0,
+        "processingCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:17.587Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "b1ea9dc92559",
+      "event": "financial_metrics",
+      "context": "publisher",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 0,
+        "processingDurationMs": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:15.495Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "c94624f5fa26",
+      "event": "messaging_metrics",
+      "context": "publisher",
+      "metrics": {
+        "received": 0,
+        "processed": 0,
+        "duplicates": 0,
+        "transientFailures": 0,
+        "invalid": 0,
+        "permanentFailures": 0,
+        "dlqForwarded": 0,
+        "published": 89,
+        "publicationFailures": 0,
+        "outboxPending": 0,
+        "outboxExhausted": 0,
+        "outboxOldestAgeMs": 0,
+        "processingDurationMs": 0,
+        "processingCount": 0
+      }
+    },
+    {
+      "timestamp": "2026-10-29T21:49:15.495Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "c94624f5fa26",
+      "event": "financial_metrics",
+      "context": "publisher",
+      "metrics": {
+        "processed": 0,
+        "rejected": 0,
+        "pendingReference": 0,
+        "failed": 0,
+        "idempotencyConflicts": 0,
+        "retries": 0,
+        "lockConflicts": 0,
+        "transientFailures": 0,
+        "commits": 0,
+        "processingDurationMs": 0
+      }
+    }
+  ],
+  "representativeLogs": [
+    {
+      "timestamp": "2026-10-29T21:48:58.520Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "c7848c78cf25",
+      "event": "http_request_completed",
+      "correlationId": "1353fc5a-ff78-46a0-aa2b-9af083ac5f18",
+      "requestId": "26b3f08c-a084-4a97-8816-6f61cf5d7489",
+      "method": "GET",
+      "operation": "GET /health/ready",
+      "result": "200",
+      "statusCode": 200,
+      "durationMs": 98
+    },
+    {
+      "timestamp": "2026-10-29T21:49:07.159Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "0f005983963d",
+      "event": "consumer_message_completed",
+      "consumerName": "wager-transactions-v1",
+      "operation": "consume",
+      "attempt": 1,
+      "durationMs": 241,
+      "result": "PROCESSED",
+      "errorCode": "",
+      "correlationId": "23a7d58d-460a-4823-8f97-cb3aab98dd21",
+      "messageId": "db85d915-de79-45a5-9c6e-ed27caf45dc2",
+      "walletId": "6b72ebf3-6d71-4f05-926b-624a93953e45",
+      "providerId": "stage7",
+      "transactionId": "3fee5759-40c3-40f6-81e0-0f5252396064"
+    },
+    {
+      "timestamp": "2026-10-29T21:49:06.494Z",
+      "level": "info",
+      "service": "jungle-wagering",
+      "instanceId": "b1ea9dc92559",
+      "event": "outbox_published",
+      "eventId": "1731215f-882a-47b9-b56b-0edf75a94a37",
+      "messageId": "ca5911fa-34a9-4e37-bac4-eefbc18db748",
+      "operation": "publish",
+      "correlationId": "13057d09-834e-4458-b297-2d73cbc383de",
+      "transactionId": "70b06205-bb77-4a62-89b2-01c15157a516",
+      "walletId": "20711b7a-6c2c-40b2-8deb-e13b647a2fb7",
+      "attempt": 1,
+      "result": "published",
+      "durationMs": 29
+    }
+  ],
+  "finalInstances": [
+    {
+      "id": "11bba0ab3cb6",
+      "service": "app1",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "11bba0ab3cb6",
+      "pid": 77393,
+      "startedAt": "2026-10-29T21:48:54.964459982Z"
+    },
+    {
+      "id": "c7848c78cf25",
+      "service": "app2",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "c7848c78cf25",
+      "pid": 77492,
+      "startedAt": "2026-10-29T21:48:55.187263914Z"
+    },
+    {
+      "id": "63664a04a1f1",
+      "service": "app3",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "63664a04a1f1",
+      "pid": 77632,
+      "startedAt": "2026-10-29T21:48:55.41305509Z"
+    },
+    {
+      "id": "64d3d8a650d3",
+      "service": "consumer",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "64d3d8a650d3",
+      "pid": 77750,
+      "startedAt": "2026-10-29T21:48:55.652821432Z"
+    },
+    {
+      "id": "fb7eb2f88fe6",
+      "service": "consumer",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "fb7eb2f88fe6",
+      "pid": 77842,
+      "startedAt": "2026-10-29T21:48:55.939561416Z"
+    },
+    {
+      "id": "0f005983963d",
+      "service": "consumer",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "0f005983963d",
+      "pid": 77104,
+      "startedAt": "2026-10-29T21:48:54.317312739Z"
+    },
+    {
+      "id": "66bc862c007c",
+      "service": "pending-reference",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "66bc862c007c",
+      "pid": 77211,
+      "startedAt": "2026-10-29T21:48:54.523151221Z"
+    },
+    {
+      "id": "6b5a806790bd",
+      "service": "pending-reference",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "6b5a806790bd",
+      "pid": 77956,
+      "startedAt": "2026-10-29T21:48:56.211265182Z"
+    },
+    {
+      "id": "4f722f5f4cf7",
+      "service": "pending-reference",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "4f722f5f4cf7",
+      "pid": 78155,
+      "startedAt": "2026-10-29T21:48:56.872913257Z"
+    },
+    {
+      "id": "c94624f5fa26",
+      "service": "publisher",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "c94624f5fa26",
+      "pid": 77293,
+      "startedAt": "2026-10-29T21:48:54.752174751Z"
+    },
+    {
+      "id": "b1ea9dc92559",
+      "service": "publisher",
+      "health": "healthy",
+      "state": "running",
+      "hostname": "b1ea9dc92559",
+      "pid": 78064,
+      "startedAt": "2026-10-29T21:48:56.523404578Z"
+    }
+  ],
+  "status": "PASS",
+  "observations": [
+    {
+      "scenario": "controlled_load",
+      "status": "PASS",
+      "methodology": "nearest-rank; one concurrent burst; no target RPS",
+      "httpRequests": 94,
+      "httpSuccess": 75,
+      "httpSuccessRate": 0.7978723404255319,
+      "expectedFinancialRejections": 19,
+      "operationalErrors": 0,
+      "sqsSends": 24,
+      "sqsUniqueCommands": 12,
+      "distinctTransactions": 57,
+      "totalTransportOperations": 118,
+      "elapsedMs": 2716.649147,
+      "observedTransportOperationsPerSecond": 43.435862938100634,
+      "httpLatencyMs": {
+        "count": 94,
+        "p50": 648.795656,
+        "p95": 825.904921,
+        "p99": 895.029704
+      },
+      "sqsSendLatencyMs": {
+        "count": 24,
+        "p50": 353.33410000000003,
+        "p95": 372.7608459999999,
+        "p99": 373.55359999999996
+      },
+      "sqsFirstCommittedCompletionMs": {
+        "count": 12,
+        "p50": 592.7024759999999,
+        "p95": 750.9601349999999,
+        "p99": 750.9601349999999
+      },
+      "outboxBeforeDrain": {
+        "pending": "91",
+        "oldest_ms": 800.549
+      },
+      "outboxFinalPending": 0,
+      "publishedEvents": "171",
+      "reconciledWallets": 38,
+      "consistent": true
+    }
+  ],
+  "finishedAt": "2026-10-29T21:49:22.121Z",
+  "cleanup": "PASS"
+}

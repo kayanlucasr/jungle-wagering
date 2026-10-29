@@ -6,6 +6,8 @@ interface LogFields {
   readonly correlationId?: string;
   readonly requestId?: string;
   readonly messageId?: string;
+  readonly eventId?: string;
+  readonly operation?: string;
   readonly transactionId?: string;
   readonly walletId?: string;
   readonly providerId?: string;
@@ -14,6 +16,14 @@ interface LogFields {
   readonly statusCode?: number;
   readonly durationMs?: number;
   readonly errorName?: string;
+  readonly consumerName?: string;
+  readonly attempt?: number;
+  readonly result?: string;
+  readonly errorCode?: string;
+  readonly metrics?: Readonly<Record<string, number>>;
+  readonly referenceExternalTransactionId?: string;
+  readonly nextAttemptAt?: string | null;
+  readonly deadline?: string;
 }
 const priority: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40 };
 

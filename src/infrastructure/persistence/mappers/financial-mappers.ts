@@ -44,7 +44,7 @@ export function transactionToRecord(tx: WagerTransaction): TransactionRecord {
     // MikroORM normalizes object parameters in-place; never hand it the frozen domain snapshot.
     resultSchemaVersion: result === undefined ? null : 1,
     terminalResult: result === undefined ? null : JSON.parse(JSON.stringify(result)) as TransactionRecord['terminalResult'],
-    processingAttempts: 0, nextAttemptAt: null, lastAttemptAt: null,
+    processingAttempts: 0, nextAttemptAt: null, lastAttemptAt: null, referenceDeadlineAt: null,
     createdAt: tx.createdAt, updatedAt: result === undefined ? tx.createdAt : new Date(result.completedAt),
     completedAt: result === undefined ? null : new Date(result.completedAt) };
 }

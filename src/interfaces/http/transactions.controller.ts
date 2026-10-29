@@ -17,7 +17,8 @@ export class TransactionsController {
     const key = idempotencyKey(req);
     const dto = submitTransactionDto(body);
     res.locals['financialTrace'] = { walletId: dto.walletId, providerId: dto.providerId };
-    const result = await this.commands.submit({ ...dto, idempotencyKey: key });
+    const result = await this.commands.submit({ ...dto, idempotencyKey: key },
+      { correlationId: String(res.getHeader('x-correlation-id')) });
     res.locals['financialTrace'] = { walletId: dto.walletId, providerId: dto.providerId, transactionId: result.transactionId };
     res.status(submissionStatus(result));
     return submissionResponse(result);

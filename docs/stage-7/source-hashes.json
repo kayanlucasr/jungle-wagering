@@ -1,0 +1,430 @@
+{
+  "gitHead": "18644e7300c0727ed9ac6443b3ed85989aceaf43",
+  "workingTree": "dirty; pre-existing stages 5/6 preserved",
+  "files": [
+    {
+      "path": "bun.lock",
+      "sha256": "b3e74bad2b5103b559b0ecfc38ab8058003bd0b073cdf9bdac30e84eec6dd1ac"
+    },
+    {
+      "path": "docker-compose.distributed-test.yml",
+      "sha256": "cf18003098dd46adefdf57eede7889bdd701e3be80144933d28cc3a02fd5c4d9"
+    },
+    {
+      "path": "docker-compose.test.yml",
+      "sha256": "a3ed90d9bd1dc801efa3861d66655b8ad675e6300bb8518bda8dece2f810ecca"
+    },
+    {
+      "path": "Dockerfile",
+      "sha256": "d812ac6ce2bb973e0204bc5cca433932c1d2279a84e07a8bfc924089a208cd45"
+    },
+    {
+      "path": "package.json",
+      "sha256": "bdfbb46a4282d0d2c6344d27aa0f01f3e1d1dc3fb2f664741f1ffcab92405e4c"
+    },
+    {
+      "path": "scripts/bootstrap-database.ts",
+      "sha256": "daa4afca0ec1685426c53c71911a6ab9eefaf48f2665b6bf4260cc40072e9827"
+    },
+    {
+      "path": "scripts/distributed-test-docker.ts",
+      "sha256": "bd8a2a252d7476f0703a52f35f4665dd0a6610a8bd2ed9de3cc8556f145f367e"
+    },
+    {
+      "path": "scripts/healthcheck.ts",
+      "sha256": "ac7a40fb08da78a3aa5d3faa9e22b3396e6afff6164359d182122227a37d97e9"
+    },
+    {
+      "path": "scripts/init-queues.ts",
+      "sha256": "7d9e57724090f4486f4c0bcc4a6a011f90e4fe6d26998d6463ab9b0b500c04c8"
+    },
+    {
+      "path": "scripts/integration-docker.ts",
+      "sha256": "ae1c27299afba8bcd0966567c6638425436a754ad5d4a62553d501ecf7f096d6"
+    },
+    {
+      "path": "scripts/load-test.ts",
+      "sha256": "161fc845d0853560f50f4270e9898792ee3f2b8c81f130f6fdcd610a67081250"
+    },
+    {
+      "path": "scripts/migrate.ts",
+      "sha256": "7599dfe0d14ce7662ea4e79ced1746cf1d83f3ad1fef39799e84cdc903335fe7"
+    },
+    {
+      "path": "scripts/smoke-build.ts",
+      "sha256": "edf5026652e0458a7565c4319ab54d3311d454af5f3cff9f2665e90263d5a642"
+    },
+    {
+      "path": "src/app.module.ts",
+      "sha256": "c82d46161990fd8fd917b1770e35092d3ab07b9974b82652ba6db960536b1564"
+    },
+    {
+      "path": "src/application/financial/errors.ts",
+      "sha256": "1942634568a924c17477493cbaaf96b7e3483c1fe415359c4e036ab7beb687b6"
+    },
+    {
+      "path": "src/application/financial/financial-query-service.ts",
+      "sha256": "6e5eb1673d48986644ed98e064f84b6bcfec991abba86e1fc82384c7678977fb"
+    },
+    {
+      "path": "src/application/financial/financial-service.ts",
+      "sha256": "c19a1444d54cd9c7636ca2a422182faf69acc608b7d3df76fc0bc7d4c54f54a7"
+    },
+    {
+      "path": "src/application/financial/ledger-cursor.ts",
+      "sha256": "7973f488d127899219115ef90184194e1613bb3a3fe79427182ef773f9934bcc"
+    },
+    {
+      "path": "src/application/financial/payload-hash.ts",
+      "sha256": "02ae6de728287fe4608bbd28eaf82175a9d76e10e3bf3b17b8c167839a2318be"
+    },
+    {
+      "path": "src/application/financial/ports.ts",
+      "sha256": "2fd9503ac43693f7bedcf7c6b02b0ae68ff041d7de4eae081d682cd7466f9e9e"
+    },
+    {
+      "path": "src/application/financial/reconciliation.ts",
+      "sha256": "3f2994b7f9aaf83e2e56c0ee27645dd2efc9ccc967c50bd0cd39e06aef64460b"
+    },
+    {
+      "path": "src/application/messaging/command-envelope.ts",
+      "sha256": "24c2c1273a3f2923328a71861ca63eec430f283f1c9d3f30e7e51caa42c7dcba"
+    },
+    {
+      "path": "src/application/messaging/integration-event.ts",
+      "sha256": "0bc3bdd7c300e9941843fe718bccd9b01ce9972a46fe516224b8d1d759075493"
+    },
+    {
+      "path": "src/application/messaging/ports.ts",
+      "sha256": "6c0e5de7c05aad6e0e8ec9322ccd34287a7f059aea83ef22e594e9d08d04d46f"
+    },
+    {
+      "path": "src/application/pending-reference/policy.ts",
+      "sha256": "0fc1c058c20e4eda70009dfc7605f4db61cb3d1b7851e069e884f936900ea75d"
+    },
+    {
+      "path": "src/application/pending-reference/ports.ts",
+      "sha256": "8b76327a0178ab95371fb31625d8bf1865fb4ad663ba473d59a82518dfeb2169"
+    },
+    {
+      "path": "src/bootstrap.ts",
+      "sha256": "dfbb3c8a867f3b90b78664ac100db212533c4d670051055c4edc966af53d6e95"
+    },
+    {
+      "path": "src/domain/errors/domain-error.ts",
+      "sha256": "86ccd0803e19a36f3eabdaf13741eb71546a0f2ed0b23c4b14fb2cdc930cb5a1"
+    },
+    {
+      "path": "src/domain/invariants.ts",
+      "sha256": "8c5e74d41e3c1c8b38112132ad6fc3ee91506e2b8654987b5ceb34346593ce08"
+    },
+    {
+      "path": "src/domain/ledger/wallet-ledger-entry.ts",
+      "sha256": "34a45557fce9cfa9059d96559a6c0197edc324c6c49bf0512df45b7de4293fe0"
+    },
+    {
+      "path": "src/domain/money/money.ts",
+      "sha256": "423ae9c587538f7105a397c751ed8790f811cbf293b43ff8312ff7bc38605474"
+    },
+    {
+      "path": "src/domain/wagering/financial-policy.ts",
+      "sha256": "ea88d0ba1fbe6012a873e16169612f60e217eb18de5c3bf6244c258d6541696b"
+    },
+    {
+      "path": "src/domain/wagering/wager-transaction-kind.ts",
+      "sha256": "4dd2e7e9b549a5179ce233816c9e15212c5df825ca646777c1c1648f8286a355"
+    },
+    {
+      "path": "src/domain/wagering/wager-transaction-status.ts",
+      "sha256": "4226b17429d65da4d74505e6119595860512ba70cf44a9a566268b75e1b7cbec"
+    },
+    {
+      "path": "src/domain/wagering/wager-transaction.ts",
+      "sha256": "a54baf3788448a685c7187ea3427de81b93e885b06730b23a8398a6652334be6"
+    },
+    {
+      "path": "src/domain/wallet/wallet.ts",
+      "sha256": "cc4aa96b57b6f27c1d86b69a28619c0e1e1160ad1199a97bebe5ef754d1b83a8"
+    },
+    {
+      "path": "src/infrastructure/config/environment.ts",
+      "sha256": "85b73d5bf4fc6bb9b9a26e4f59fa1d54e346df4abe38471e77710227d6f6aa1f"
+    },
+    {
+      "path": "src/infrastructure/messaging/outbox-publisher.ts",
+      "sha256": "5e7d31e7bcf377742897bda1a2181776b332461fa8c22a566a83d53abcd8fccc"
+    },
+    {
+      "path": "src/infrastructure/messaging/queue-setup.ts",
+      "sha256": "faacb8266baabda3d1ea15d29c2acbc141aa8477a66445502e85ecec8ee04403"
+    },
+    {
+      "path": "src/infrastructure/messaging/retry.ts",
+      "sha256": "0f5f963a717d26d75f0c555f41a7e474c8a5ccdefee8b82624c1c7c489062985"
+    },
+    {
+      "path": "src/infrastructure/messaging/sqs.service.ts",
+      "sha256": "d02294385a33779ec249f9500dcfd07a32a6f8d4e10a4debb963ac7c371175c5"
+    },
+    {
+      "path": "src/infrastructure/messaging/transaction-consumer.ts",
+      "sha256": "186f16ebc6ef0c179de26a950e9986f423dd3f5650dabc89e82c85429c628cf2"
+    },
+    {
+      "path": "src/infrastructure/observability/financial-metrics.ts",
+      "sha256": "4888b801c09814bf140f0825dc2d351ebcbb83d366e194a0adb5dbe1d7eb9bf9"
+    },
+    {
+      "path": "src/infrastructure/observability/json-logger.ts",
+      "sha256": "da91349ef45f764fff77a8d2fee58e198f93034a1716f03be3d9028ca3df5d52"
+    },
+    {
+      "path": "src/infrastructure/observability/messaging-metrics.ts",
+      "sha256": "0de5f3faf45f27997b16b45b6ea2f530b260d38ef3216e6014a5045210ad48d7"
+    },
+    {
+      "path": "src/infrastructure/observability/pending-reference-metrics.ts",
+      "sha256": "a2815e4d9d5562ad12060f0fc271fb6e2672c7632f55b055e14a051db4d3909f"
+    },
+    {
+      "path": "src/infrastructure/pending-reference/reference-scheduler.ts",
+      "sha256": "a1ab5bb9f40a7ccad7c16de16b3bf254db9e2c81a22ad6f86e978c93ba60a7e3"
+    },
+    {
+      "path": "src/infrastructure/persistence/access-sql.ts",
+      "sha256": "b5e3956a8d5b9fb37c85c926d22de369c674db5b7db23b6d0cbceb752d392c98"
+    },
+    {
+      "path": "src/infrastructure/persistence/database.service.ts",
+      "sha256": "a6c182939239cfe0b80916136c8541fbba3404c2c5993db4d14441b3810fa95c"
+    },
+    {
+      "path": "src/infrastructure/persistence/entities/financial-records.ts",
+      "sha256": "efd5764c55f302d91049448cdd5036d37307025b6b149aa5d14687d8a805a296"
+    },
+    {
+      "path": "src/infrastructure/persistence/financial-unit-of-work.ts",
+      "sha256": "bd389b476e04a623b54e0b5509c29fd73ad303c1ea92ff8bbc41efb091092a57"
+    },
+    {
+      "path": "src/infrastructure/persistence/mappers/financial-mappers.ts",
+      "sha256": "51d0ebc43242bea02098b808e9456fc502c7a4d49ec6d273d241e112abfcaac7"
+    },
+    {
+      "path": "src/infrastructure/persistence/migrations/financial-sql.ts",
+      "sha256": "c17e9e452db8b78821ceec97d8072acb00925a3620f289815266615bc03b55dc"
+    },
+    {
+      "path": "src/infrastructure/persistence/migrations/Migration20261028000100.ts",
+      "sha256": "6e62f183b5b766d4d3f26ddd9e5642ae545d6b4bc0d3ea1e8cfe10a5c6e5af6d"
+    },
+    {
+      "path": "src/infrastructure/persistence/migrations/Migration20261028000200.ts",
+      "sha256": "4b063951a99df7eacb7095da25f7f000364bdaceff5e26d0db4f3089ffb4b888"
+    },
+    {
+      "path": "src/infrastructure/persistence/migrations/Migration20261029000100.ts",
+      "sha256": "17ec9803b4a50358cc69db3be7a4c58e1941e2693d218a7c2323239347871e62"
+    },
+    {
+      "path": "src/infrastructure/persistence/migrations/Migration20261029000200.ts",
+      "sha256": "c103bc6dd7362787e1c045cfc95464ed0449f9ae0bdad13af1a8c5aa138ef6f7"
+    },
+    {
+      "path": "src/infrastructure/persistence/migrations/pending-reference-sql.ts",
+      "sha256": "5ca1f571e84316f8a3dac880d7d5e82b605abedb9d3242e9b77aabff8e6ac285"
+    },
+    {
+      "path": "src/infrastructure/persistence/orm-options.ts",
+      "sha256": "d8d0d683e359ef81489430c0f1a12c25a21292a3bf7e71d7f0be5ac9b3d3f9e7"
+    },
+    {
+      "path": "src/infrastructure/persistence/outbox-store.ts",
+      "sha256": "b357cce3d9f262f330d1bd4a69d0484e70db702d5a4a9b1ca8be5d6421732642"
+    },
+    {
+      "path": "src/infrastructure/persistence/provision-access.ts",
+      "sha256": "22709dd2cf4a12e640235e7d8fb54afebbedb705ece57823f0cc01efa69adc2f"
+    },
+    {
+      "path": "src/infrastructure/persistence/repositories/ledger-repository.ts",
+      "sha256": "e9f66dc6775a40bc68799c2585e3a233929be758bbd5a34e11f1b38e1f9a7acf"
+    },
+    {
+      "path": "src/infrastructure/persistence/repositories/message-repositories.ts",
+      "sha256": "a75da0d4f4c969105572c487d5eed0ef313d63bf8b6680c517ac8a2890eb42a1"
+    },
+    {
+      "path": "src/infrastructure/persistence/repositories/pending-reference-repository.ts",
+      "sha256": "b510cdfe5fa6604926b5d0f08cf921e26ef4765b97fc23b565e71cc2aab70105"
+    },
+    {
+      "path": "src/infrastructure/persistence/repositories/transaction-repository.ts",
+      "sha256": "c725e7fd97f0e984c970c3c97afa8c51106b2adde3c4265107806f6baad5a1d9"
+    },
+    {
+      "path": "src/infrastructure/persistence/repositories/wallet-repository.ts",
+      "sha256": "c3d51212bcba07b0388859760ef047db343af905e48cf90e49f19382d20d20de"
+    },
+    {
+      "path": "src/interfaces/http/exception.filter.ts",
+      "sha256": "2c75b3801223b9bcb4f922d8e8d3b92598ef554adcc2c7e41869cccc8fc68e87"
+    },
+    {
+      "path": "src/interfaces/http/financial-dtos.ts",
+      "sha256": "269b186b1200a9a1b836ca7adaeca02ab304d15fdae5eedaf57aa1ad8c05b362"
+    },
+    {
+      "path": "src/interfaces/http/financial-responses.ts",
+      "sha256": "d8d3284ace908ffdee40a0a40f182cc95933707e08d2ef9aa9d7ba094db39f49"
+    },
+    {
+      "path": "src/interfaces/http/health.controller.ts",
+      "sha256": "fcaa67cbe00d168a355e8e0603b694756eb16b46eef77069d8e15c1c1c3937c2"
+    },
+    {
+      "path": "src/interfaces/http/http-metrics.ts",
+      "sha256": "afa6c1949122583e5191eb946afcb76c4e6e24c19402da37abbf5860260317df"
+    },
+    {
+      "path": "src/interfaces/http/transactions.controller.ts",
+      "sha256": "11925ff1e1b5e5fc6ca202bc9dc433a747f0ca4a1c85828b011007baba31c02d"
+    },
+    {
+      "path": "src/interfaces/http/wallets.controller.ts",
+      "sha256": "fcf9af088ececc34539547fbee293d1eff9251fc468f8bd348c0787af6f2a28f"
+    },
+    {
+      "path": "src/main.ts",
+      "sha256": "4b8e3bab6320cf7cff82263b1a897f8b863a73b221a1451ad1a7387421575aae"
+    },
+    {
+      "path": "src/workers/main.ts",
+      "sha256": "b90409f6ab43626fa56affb48208f133aab038a889a8a54f23d75a081d2a99a8"
+    },
+    {
+      "path": "test/distributed/load.ts",
+      "sha256": "2274fb2eaedfa5d2514ec62906d5c2e2720e8c7b5c4b664454a99d2a027a201b"
+    },
+    {
+      "path": "test/distributed/restart.ts",
+      "sha256": "66c72e54c1cdbd6fef289a3d581776705b873aa43ee57ecbdb392f6904bc846a"
+    },
+    {
+      "path": "test/distributed/scenarios.ts",
+      "sha256": "74f926d2b20c41bee3480145a833820014bd1feefe6a466737f76ea24f938c3b"
+    },
+    {
+      "path": "test/distributed/support.ts",
+      "sha256": "8e9de749d64cd90a4dfb0dfdc2d44ba7b31dad65e61cc177404bda118da2a2c9"
+    },
+    {
+      "path": "test/integration/financial.test.ts",
+      "sha256": "bd169623e09f76c74f11a363f2d7e6f1d96d148521c481aab2c302a82afc07de"
+    },
+    {
+      "path": "test/integration/foundation.test.ts",
+      "sha256": "bbdfb11b7d49e5e07c2148fe8bbb70016db46097b3919651f54d3420a64934a9"
+    },
+    {
+      "path": "test/integration/http.test.ts",
+      "sha256": "bc1ccea2b58bf13e1e44ee01496d68fb90ec3dd49d2fecffd30ddc8836ddc5a7"
+    },
+    {
+      "path": "test/integration/messaging.test.ts",
+      "sha256": "aed0fd508341e9519a1f213c37c5268e6c145d5252699adbeaedd7102f694274"
+    },
+    {
+      "path": "test/integration/pending-reference.test.ts",
+      "sha256": "05a2207bbfc9a6acd167736b5ec378c7a983257737575c17a53829bb7751e4b8"
+    },
+    {
+      "path": "test/support/config.ts",
+      "sha256": "690b185489df0f2bd36bcdc7bd3921632b9e9f63ecd0a771b74fc8b1444cbc0b"
+    },
+    {
+      "path": "test/support/distributed-worker-health.ts",
+      "sha256": "52c2587322ec01f29d2d9b829a00e01370e88c2e8eb53fd9961e74c5471b9a5a"
+    },
+    {
+      "path": "test/support/distributed-worker.ts",
+      "sha256": "95010b17eee5f428b267c6741de591e1b660046f94fe30c54d3e426444a000a0"
+    },
+    {
+      "path": "test/support/domain.ts",
+      "sha256": "d8f8f3510ca5144ee6134efe99c87108b3de3d3aa765fe5c25ac914d1c944471"
+    },
+    {
+      "path": "test/support/financial-process.ts",
+      "sha256": "c8562deb7ff4a76fe6deeee25539ce03d3e8e65692cf93a267921f8cd0ad7a0f"
+    },
+    {
+      "path": "test/support/http-process.ts",
+      "sha256": "ac6d50ef04ae0fbaba8fe066d76dd3929f53068e0e2ef7c4d554b2cea4101bb2"
+    },
+    {
+      "path": "test/support/messaging-process.ts",
+      "sha256": "36539fe893e281676056026a66f5145c9ccd07dcad633ae7dfafd6eab1f13cb2"
+    },
+    {
+      "path": "test/support/pending-reference-process.ts",
+      "sha256": "9b9b5644aa29693fd5f768c39b6aea74eaac3ebe975bf98ce2cb2c0797accc22"
+    },
+    {
+      "path": "test/unit/bootstrap.test.ts",
+      "sha256": "239e737075af2e7dcab1a82a1fc17bbcf94802a8e4e06563973f523daedd4382"
+    },
+    {
+      "path": "test/unit/domain/financial-policy.test.ts",
+      "sha256": "f303e021e940218ea165b01777a4c78fe0ae03dfc675023f2f853064852daa8b"
+    },
+    {
+      "path": "test/unit/domain/money.test.ts",
+      "sha256": "d7384ce4fc75cc5ce9c5ab0022237d50a9f57eed221fbb453325909f81456fb9"
+    },
+    {
+      "path": "test/unit/domain/wager-transaction.test.ts",
+      "sha256": "f0d05b06d1197cd7f4de373c2a37a3050e7a546e6b26b62997f24050101ad726"
+    },
+    {
+      "path": "test/unit/domain/wallet-ledger-entry.test.ts",
+      "sha256": "94f03eb9f1788916f83b8ce07785808f5c12b33133aaa4ea8f5ce194852c2a24"
+    },
+    {
+      "path": "test/unit/domain/wallet.test.ts",
+      "sha256": "26e8e138a0f6742d4d526d7b78ac79aed9862e2c89fc842cb5f20c81a9bb6e63"
+    },
+    {
+      "path": "test/unit/environment.test.ts",
+      "sha256": "23c57a01e559a5e072384d6bba38826b8dd047c9d3ecc0f7b4d05a9aba8604aa"
+    },
+    {
+      "path": "test/unit/financial/reconciliation.test.ts",
+      "sha256": "0a1c48ea141debfd8fb24753145aa589d5bfacc7aa928b00951d7a21125edbd8"
+    },
+    {
+      "path": "test/unit/http-contracts.test.ts",
+      "sha256": "124cfb4f789cf2256b43ea030b5addef601bb8bcc3439bcabcc1483dbd124cab"
+    },
+    {
+      "path": "test/unit/logger.test.ts",
+      "sha256": "7cf7a2026073de213de0ffce1841f1f000bed008da5351c11b1ee411cd7909f8"
+    },
+    {
+      "path": "test/unit/messaging.test.ts",
+      "sha256": "aa142a47aff9c3a7882122ba6947800c02196bcf59249049f44440e2bdd91b9a"
+    },
+    {
+      "path": "test/unit/pending-reference.test.ts",
+      "sha256": "fffd4cb0f4009d42cd29ac10f4b2b53c152d8a95a1ed989c18f01156b9888ec8"
+    },
+    {
+      "path": "tsconfig.build.json",
+      "sha256": "4fb01175b35cd1379fd7daaab407f548a86a45bf1bdec9eaf5d52a26cc8c0486"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "5313894ab7c9cb5171b7b0271ba31104c474921c059cb73c715c4709370bfc65"
+    }
+  ]
+}

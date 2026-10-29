@@ -1,4 +1,4 @@
-# Arquitetura — Etapas 1 a 4
+# Arquitetura — Etapas 1 a 7
 
 ## Escopo e autorização
 
@@ -9,8 +9,11 @@ aprovou o plano, revisou integralmente os três SQLs e autorizou explicitamente 
 
 Há regras financeiras puras, persistência ACID, ledger protegido, idempotência persistente,
 API REST e reconciliação estruturada. A Etapa 4 usa as camadas e proteções aprovadas na
-Etapa 3, sem migrations ou novos privilégios. Não há consumer, publisher, worker de
-referências ou autenticação externa. A Etapa 5 não foi iniciada.
+Etapa 3, sem migrations ou novos privilégios. A Etapa 5 foi autorizada em 29/10/2026 e
+acrescenta consumer FIFO, inbox, outbox e publisher separado. A Etapa 6 foi aprovada após
+revisão de plano/DDL e acrescenta scheduler persistente de referências. Autenticação
+externa continua fora do escopo. Detalhes em [docs/MESSAGING.md](docs/MESSAGING.md) e
+[docs/PENDING_REFERENCES.md](docs/PENDING_REFERENCES.md).
 
 ## Organização e dependências
 
@@ -135,8 +138,10 @@ por processo, incluindo inconsistências de reconciliação, sem uso em integrid
 Não foi adicionado exporter, novo endpoint de métricas ou infraestrutura de monitoramento.
 Os contratos completos e seus limites estão em [docs/HTTP_API.md](docs/HTTP_API.md).
 
-Métricas financeiras, DLQ, retries e outbox lag ainda não estão implementadas porque os
-fluxos correspondentes não existem nesta etapa. Não se declara observabilidade final completa.
+Etapa 5: contadores por processo cobrem mensagens, duplicatas, falhas transitórias,
+DLQ, publicações, duração acumulada e quantidade de operações; gauges mostram pendências,
+eventos esgotados e idade do evento mais antigo. Snapshots JSON são emitidos a cada 10s.
+Não há exporter/agregador externo ou medição de SLO.
 
 ## Infraestrutura implementada
 
@@ -145,7 +150,7 @@ e aplicação. Sem Docker socket montado no LocalStack: SQS não precisa dele.
 
 Aplicação sem host port fixa por padrão. `--scale app=3` atribui portas dinâmicas,
 sem `container_name`. Todos os processos compartilharão código e PostgreSQL;
-entrypoints de workers serão adicionados apenas quando autorizados.
+entrypoints separados de consumer/publisher foram adicionados na Etapa 5 autorizada.
 
 Compose de teste separado: sem portas/volumes compartilhados, projeto aleatório,
 PostgreSQL descartável e banco adicional aleatório criado para up/down/up.
@@ -183,19 +188,43 @@ A exclusão conjunta de REFUND/ROLLBACK diretos recebeu aprovação explícita a
 É uma restrição adicional ao item 7.4 do enunciado (unicidade por tipo), adotada para
 impedir dupla compensação. ROLLBACK de REFUND continua permitido e não reabre a BET.
 
-## Inbox/outbox — estruturas preparadas, workers futuros
+## Inbox/outbox — Etapa 5
 
-Tabelas, índices, vínculos e proteção de identidade/finalização existem; runtime tem
-somente SELECT nessas duas tabelas. Nenhum worker ou publicação é executado. As portas
-da unidade de trabalho podem receber repositories dessas tabelas usando o mesmo contexto
-transacional quando a mensageria for autorizada.
+As cinco tabelas financeiras permanecem. A migration nova `20261029000100` concede
+INSERT e UPDATE apenas nas colunas operacionais de inbox/outbox, preservando as
+restrições do ledger, identidades, snapshots e roles. Acrescenta `position` identity
+na outbox, índice por aggregate/position e `last_error_code`. O trigger passa a aceitar
+`WagerTransactionPendingReference` enquanto a transação está em PENDING_REFERENCE.
+O down recusa registros de mensageria; não apaga eventos/diagnósticos para facilitar rollback.
 
-Planejamento futuro: inbox, transação, saldo, ledger e eventos no mesmo commit SQL.
-Ack depois do commit; referência pendente retomada por worker do banco.
+FinancialSession agora contém repositories inbox/outbox ligados ao mesmo EntityManager.
+FinancialService continua sendo o único processador usado pela API e pelo consumer.
+Inbox é adquirido por `(consumerName,messageId)` antes dos locks financeiros; hash
+incompatível é conflito. Novas operações criam eventos; replay não cria outro evento.
+Inbox, transação, saldo, ledger e eventos têm um único commit. Commit incerto é
+consultado em snapshot somente leitura antes de decidir por redelivery.
 
-Outbox com claim `FOR UPDATE SKIP LOCKED`, lease e publicação fora da transação financeira.
-Crash após envio pode duplicar publicação; eventId estável e consumidores idempotentes
-protegem efeitos. A garantia será at-least-once, sem promessa de exactly-once.
+Outbox usa `FOR UPDATE SKIP LOCKED`, owner por processo, lease e fencing por owner/attempt.
+Somente o evento não publicado mais antigo de cada wallet é elegível. Isso mantém
+sequência entre publishers sem serializar wallets distintas. A sequência identity pode
+ter lacunas por rollback; não é um contador financeiro. Publicação ocorre depois do commit
+do claim, sem transação aberta durante a chamada SQS. Marcação exige confirmação de envio
+e claim ainda vigente. Crash após envio permite republicação com o mesmo eventId.
+O limite de tentativas deixa eventos esgotados duráveis e visíveis em métricas; bloqueia
+a sequência daquela wallet até intervenção operacional. Não há descarte automático.
+
+Consumer usa um receive por loop, com múltiplos loops configuráveis e grupos derivados
+de walletId. Isso evita receber um batch da mesma wallet e ultrapassar uma mensagem que
+falhou. Heartbeat renova visibilidade durante o processamento. Long polling tem timeout
+de rede maior que a espera SQS; retries de mensagem são limitados, com backoff e jitter.
+Mensagens inválidas não entram no FinancialService. Esgotadas, são copiadas à DLQ com
+diagnóstico antes de remover a origem; redrive nativo cobre quedas antes dessa operação.
+Rejeição de negócio confirmada recebe ACK, sem virar falha de infraestrutura.
+
+SIGTERM/SIGINT abortam polling e aguardam operações em andamento. O entrypoint limita
+drenagem por prazo; um processo morto recupera-se por rollback SQL, redelivery e leases.
+Nenhuma garantia financeira depende desses hooks. Subscribers externos devem deduplicar
+eventId persistentemente; o teste de projeção comprova esse padrão além da dedup do broker.
 
 ## Identidade externa
 
@@ -248,8 +277,87 @@ Falha não classificada após conclusão do trabalho pode representar commit inc
 retorna indisponibilidade e exige repetição da identidade, sem rejeição financeira ou
 retry automático dessa situação desconhecida. Constraints permanecem erro de integridade.
 
-Próxima etapa: implementar inbox/outbox na mesma unidade de trabalho, com grants de
-escrita específicos; definir consumer/publisher, retries/DLQ e retomada de referências.
-Testar crash após commit/antes do ack e publishers concorrentes. Autorização externa
-do provider continua pendente. Esses fluxos exigem autorização própria e não estão
-cobertos por promessa de entrega exactly-once. Nenhum deles foi antecipado nesta etapa.
+Etapa 5 implementou inbox/outbox, grants específicos, consumer/publisher e retries/DLQ,
+com validação real de crashes e concorrência. A Etapa 6 implementou retomada de referências
+com deadline persistido, TTL e orçamento de tentativas. Autorização externa do provider
+permanece pendente. A garantia de transporte é at-least-once; a unicidade dos efeitos
+financeiros permanece fundamentada no PostgreSQL.
+
+## Scheduler de referências — Etapa 6
+
+FinancialService.resolveNextPendingReference é a entrada interna explícita. Submit e
+resolução compartilham evaluate/persistDecision e FinancialPolicy; nenhum segundo motor
+foi criado. Replays nunca chamam o scheduler. Estados terminais continuam imutáveis.
+
+O claim faz SELECT de wallet com EXISTS de pendência elegível e FOR UPDATE OF w SKIP LOCKED;
+o EXISTS é leitura MVCC, sem lock da linha de transação. Só depois trava uma transação
+pendente daquela wallet. Referência/histórico são consultas MVCC. Assim, wallet → transaction
+permanece a ordem; referência de outra wallet não introduz uma segunda aquisição de wallet.
+Scheduler não trava inbox; publisher não solicita wallet enquanto segura claim de outbox.
+
+Claim, decisão, reagendamento/conclusão e outbox são uma única transação SQL curta, sem
+rede SQS, polling ou espera por referência dentro dela. Não se acrescentou lease persistente:
+rollback libera o claim. Statement/lock timeouts e idle_in_transaction_session_timeout
+local protegem sessões abandonadas; o teste recupera mesmo com o processo antigo vivo.
+Outra instância consulta o status persistido e nunca reexecuta uma transação terminal.
+
+Migration 20261029000200 incorpora o DDL aprovado: reference_deadline_at, CHECK, trigger
+de imutabilidade, índice parcial e UPDATE restrito da coluna nova. Backfill de pendências
+legadas usa created_at + 24h, sem mudar status/saldo/ledger. Como o backfill dispara triggers
+diferidos, a migration executa SET CONSTRAINTS ALL IMMEDIATE antes do DDL seguinte e restaura
+ALL DEFERRED; não desativa proteções. É um ajuste de execução do DDL, sem mudança do schema
+aprovado. O down recusa remover deadlines já preenchidos. Writers antigos devem ser drenados
+antes do upgrade. Os SQLs propostos originais permanecem preservados em docs/stage-6/.
+
+Novas pendências recebem prazo fixo na primeira transição e next_attempt_at. Defaults:
+24h, 20 avaliações totais contando aceite inicial, base 1s/teto 300s com equal jitter,
+polling 1s e lote de 20 transações independentes. Configuração de TTL nova não estende
+prazos existentes. A resolução limpa next_attempt_at no mesmo UPDATE que terminaliza,
+como exige transactions_terminal_ck. Em cada retry ainda pendente, somente metadados mudam;
+o evento WagerTransactionPendingReference não é repetido. Ao concluir, Processed/Rejected
+e, se houver ledger, WalletBalanceChanged entram na outbox no mesmo commit.
+
+No deadline, REJECTED/REFERENCE_NOT_FOUND prevalece mesmo se a referência tiver chegado
+depois. Antes do prazo, a última avaliação pode concluir uma referência válida; se continuar
+ausente/pendente, rejeita por orçamento. Falha de infraestrutura faz rollback e não consome
+tentativa financeira. A correlação vem do primeiro evento de pendência na outbox; legado
+sem esse evento usa pending-<md5(transactionId)> como identificação determinística de fallback.
+
+ReferenceScheduler e o entrypoint pending-reference são processos separados. O scheduler
+depende de PostgreSQL e das migrations, sem acoplamento de disponibilidade ao SQS. Eventos
+ficam duráveis até o publisher recuperar o broker. Logs incluem referência, prazo, próxima
+tentativa, resultado confirmado, failure code e duração; métricas são locais ao processo.
+Não há contador inventado de leases recuperados: sem leases persistidos, o rollback não
+deixa um marcador distinguível de um claim nunca confirmado. A recuperação é demonstrada
+pelos testes de crash/sessão abandonada. A Etapa 7 não foi iniciada.
+
+## Validação distribuída e observabilidade — Etapa 7
+
+Plano autorizado em 29/10/2026. O ambiente adicional em
+`docker-compose.distributed-test.yml` usa três containers API, três consumers, dois
+publishers e três schedulers, com PostgreSQL/tmpfs e LocalStack exclusivos. O runner
+host controla SIGKILL/reinício sem montar Docker socket no teste e remove apenas o
+projeto aleatório gerado. Não altera o Compose principal, migrations ou política.
+
+Readiness agora consulta as cinco tabelas e as colunas operacionais essenciais, com
+LIMIT 0, além das filas. Namespace sozinho não representa schema financeiro pronto.
+Liveness permanece independente. Os probes dos workers no Compose de teste observam
+startup/heartbeat do processo de produção, via supervisor exclusivo de testes.
+
+FinancialMetrics pertence à infraestrutura e observa a UoW: status é contabilizado
+após commit, com comparação do status anterior sob a transação existente. Replay,
+reagendamento sem mudança de status e rollback não contam como novo efeito. OPENING
+não é incluído nos contadores de comandos externos. Retry/deadlock/lock timeout e
+conflitos de idempotência têm contadores específicos. A observação não participa de
+qualquer decisão financeira nem tenta substituir a auditoria SQL. Commit incerto
+pode não ser contabilizado no processo que perdeu a resposta.
+
+APIs e workers emitem snapshots por processo a cada 10s. Publisher separa eventId do
+messageId SQS; logs incluem operação, resultado, código de erro estável e duração
+quando aplicáveis. application_name identifica a instância nas conexões PostgreSQL.
+Sem exporter/serviço novo, endpoint de falha ou flag de crash em produção. Injeções
+são adapters do harness usando o PostgreSQL real.
+
+Resultados, hashes de fonte, contagens e limites em
+[docs/stage-7/RESULT.md](docs/stage-7/RESULT.md). O parecer local não atualiza a
+implantação principal nem certifica capacidade de produção. Etapa 8 não iniciada.

@@ -1,0 +1,323 @@
+Etapa 7 - baseline executada em 29/10/2026
+Projeto Compose isolado: jungle-financial-test-155e0211
+Bun 1.4.4; Docker client/server 29.9.2; Compose v5.6.1
+
+=== Build/typecheck/smoke ===
+$ bun run build && bun scripts/smoke-build.ts
+$ bun run typecheck && bun node_modules/typescript/bin/tsc -p tsconfig.build.json
+$ bun node_modules/typescript/bin/tsc --noEmit
+{"compiledBootstrap":"passed","liveness":200,"readinessWithoutDependencies":503}
+{"compiledProcessExitCode":143}
+
+=== Unitarios: resultados individuais e totais ===
+(pass) application bootstrap without available dependencies > starts and serves public liveness independently of PostgreSQL and SQS [17.65ms]
+(pass) application bootstrap without available dependencies > propagates a safe correlation ID [1.72ms]
+(pass) application bootstrap without available dependencies > replaces an invalid correlation ID [0.76ms]
+(pass) application bootstrap without available dependencies > returns 503 when real driver connections cannot reach either dependency [36.11ms]
+(pass) application bootstrap without available dependencies > maps unknown routes to a safe structured error [2.43ms]
+(pass) application bootstrap without available dependencies > maps malformed JSON to a 400 without echoing the payload [316.42ms]
+(pass) application bootstrap without available dependencies > financial queries with unavailable PostgreSQL map infrastructure failure to 503 [4.59ms]
+(pass) environment validation > loads valid environment, defaults and immutable config [0.13ms]
+(pass) environment validation > reports variable names without their sensitive values [0.29ms]
+(pass) environment validation > rejects invalid NODE_ENV (invalid) [0.55ms]
+(pass) environment validation > rejects invalid LOG_LEVEL (verbose) [0.04ms]
+(pass) environment validation > rejects invalid DB_PORT (1.5) [0.04ms]
+(pass) environment validation > rejects invalid DB_POOL_MAX (0) [0.03ms]
+(pass) environment validation > rejects invalid DEPENDENCY_TIMEOUT_MS (0) [0.06ms]
+(pass) environment validation > rejects invalid PORT (65536) [0.03ms]
+(pass) environment validation > rejects invalid SQS_QUEUE_NAME (standard) [0.04ms]
+(pass) environment validation > rejects invalid SQS_DLQ_NAME (wager-transactions.fifo) [0.04ms]
+(pass) environment validation > rejects invalid SQS_MAX_RECEIVE_COUNT (-1) [0.04ms]
+(pass) environment validation > rejects invalid SQS_VISIBILITY_TIMEOUT_SECONDS (43201) [0.03ms]
+(pass) environment validation > rejects invalid AWS_REGION () [0.02ms]
+(pass) environment validation > rejects invalid DB_NAME (unsafe;drop) [0.02ms]
+(pass) environment validation > rejects invalid SQS_ENDPOINT (file:///tmp) [0.03ms]
+(pass) environment validation > rejects invalid SQS_ENDPOINT (http://localhost:4566?secret=token) [0.02ms]
+(pass) environment validation > requires connection credentials explicitly [0.09ms]
+(pass) HTTP DTO validation and exact response contracts > accepts domain-compatible non-UUID identifiers and canonical monetary strings [0.91ms]
+(pass) HTTP DTO validation and exact response contracts > rejects unknown top-level/nested fields and a body-supplied idempotency key/hash [0.19ms]
+(pass) HTTP DTO validation and exact response contracts > rejects numeric amounts, missing/null references, OPENING and malformed identifiers [0.29ms]
+(pass) HTTP DTO validation and exact response contracts > pagination size is bounded and repeated/nested/unknown query parameters are rejected [0.17ms]
+(pass) HTTP DTO validation and exact response contracts > wallet response preserves financial precision and serializes bigint versions as strings [1.97ms]
+(pass) HTTP DTO validation and exact response contracts > reconciliation uses original HTTP field names and an exact signed difference [0.81ms]
+(pass) HTTP DTO validation and exact response contracts > HTTP submission statuses distinguish pending, rejection, success and permanent failure [0.27ms]
+(pass) HTTP DTO validation and exact response contracts > replay maps the historical terminal result and excludes idempotency/hash/ORM fields [1.88ms]
+(pass) Opaque ledger cursor and HTTP metrics > cursor preserves bigint precision, upper bound and wallet binding across processes [0.80ms]
+(pass) Opaque ledger cursor and HTTP metrics > malformed/out-of-range/empty cursor state is rejected [0.11ms]
+(pass) Opaque ledger cursor and HTTP metrics > metrics count reconciliation inconsistencies independently of financial processing [0.05ms]
+(pass) writes JSON and respects the configured minimum log level [0.10ms]
+(pass) never serializes framework exception objects or traces [0.07ms]
+(pass) Messaging envelope and operational limits > validates canonical command independently of property order and whitespace [0.90ms]
+(pass) Messaging envelope and operational limits > rejects numeric money, unsupported versions, OPENING and unknown fields [1.00ms]
+(pass) Messaging envelope and operational limits > wallet-scoped FIFO groups support Unicode and remain stable across processes [0.08ms]
+(pass) Messaging envelope and operational limits > backoff is bounded, exponential and never zero [0.07ms]
+(pass) Messaging envelope and operational limits > configuration rejects unsafe leases, retry ranges and colliding queues [0.19ms]
+(pass) Pending-reference scheduling policy > uses bounded exponential equal jitter with deterministic injected randomness [0.08ms]
+(pass) Pending-reference scheduling policy > never schedules beyond the persisted deadline or mutates its input dates [0.04ms]
+(pass) Pending-reference scheduling policy > configuration preserves approved defaults and freezes policy [0.04ms]
+(pass) Pending-reference scheduling policy > rejects unbounded or contradictory operating parameters [0.16ms]
+(pass) FinancialPolicy opening and basic movements > positive opening bundles OPENING and CREDIT at wallet version one [0.31ms]
+(pass) FinancialPolicy opening and basic movements > zero opening has no transaction/ledger, reconciles to zero and starts at version one [0.40ms]
+(pass) FinancialPolicy opening and basic movements > requires deterministic IDs for a positive opening [0.22ms]
+(pass) FinancialPolicy opening and basic movements > BET debits once in the decision, while original objects remain unchanged [0.60ms]
+(pass) FinancialPolicy opening and basic movements > rejects insufficient BET with no ledger, version change or balance change [0.49ms]
+(pass) FinancialPolicy opening and basic movements > WIN credits and LOSS has no movement or version increment [1.26ms]
+(pass) FinancialPolicy opening and basic movements > reconciles a sequence including opening, debit, credit and loss [1.63ms]
+(pass) FinancialPolicy opening and basic movements > credit overflow is rejected without changing the wallet [0.45ms]
+(pass) FinancialPolicy opening and basic movements > wallet ownership and operation currency are checked before movement [0.37ms]
+(pass) FinancialPolicy opening and basic movements > missing/wrong wallet is an explicit domain error without partial changes [0.41ms]
+(pass) FinancialPolicy opening and basic movements > identical supplied state, IDs and time produce identical decisions [0.56ms]
+(pass) FinancialPolicy reversals > REFUND credits a processed BET [0.75ms]
+(pass) FinancialPolicy reversals > ROLLBACK credits a processed BET [1.01ms]
+(pass) FinancialPolicy reversals > blocks double compensation REFUND followed by REFUND on the same BET [0.96ms]
+(pass) FinancialPolicy reversals > blocks double compensation ROLLBACK followed by ROLLBACK on the same BET [0.74ms]
+(pass) FinancialPolicy reversals > blocks double compensation REFUND followed by ROLLBACK on the same BET [0.70ms]
+(pass) FinancialPolicy reversals > blocks double compensation ROLLBACK followed by REFUND on the same BET [0.87ms]
+(pass) FinancialPolicy reversals > ROLLBACK of WIN debits the credited amount [0.74ms]
+(pass) FinancialPolicy reversals > ROLLBACK of REFUND is allowed, but does not reopen direct reversal rights on the original BET [0.82ms]
+(pass) FinancialPolicy reversals > a rejected reversal for lack of funds does not consume reversal rights [0.78ms]
+(pass) FinancialPolicy reversals > ROLLBACK of REFUND also obeys the nonnegative balance invariant [0.68ms]
+(pass) FinancialPolicy reversals > rejected amount mismatch also leaves reversal rights available [0.49ms]
+(pass) FinancialPolicy reversals > a FAILED reversal does not consume the right to reverse the BET [0.42ms]
+(pass) FinancialPolicy reversals > an internal OPENING cannot be reversed [0.13ms]
+(pass) FinancialPolicy reversals > REFUND cannot reference WIN [0.15ms]
+(pass) FinancialPolicy reversals > REFUND cannot reference LOSS [0.09ms]
+(pass) FinancialPolicy reversals > REFUND cannot reference REFUND [0.09ms]
+(pass) FinancialPolicy reversals > REFUND cannot reference ROLLBACK [0.09ms]
+(pass) FinancialPolicy reversals > ROLLBACK cannot reference LOSS [0.24ms]
+(pass) FinancialPolicy reversals > ROLLBACK cannot reference ROLLBACK [0.09ms]
+(pass) FinancialPolicy reference resolution and snapshots > REFUND before reference waits without effect and processes once the BET arrives [0.34ms]
+(pass) FinancialPolicy reference resolution and snapshots > ROLLBACK before reference waits without effect and processes once the BET arrives [0.41ms]
+(pass) FinancialPolicy reference resolution and snapshots > waits for a reference that exists but is still pending [0.16ms]
+(pass) FinancialPolicy reference resolution and snapshots > rejects a REJECTED reference [0.17ms]
+(pass) FinancialPolicy reference resolution and snapshots > rejects a FAILED reference [0.32ms]
+(pass) FinancialPolicy reference resolution and snapshots > rejects a reference with different providerId [0.33ms]
+(pass) FinancialPolicy reference resolution and snapshots > rejects a reference with different playerId [0.13ms]
+(pass) FinancialPolicy reference resolution and snapshots > rejects a reference with different walletId [0.14ms]
+(pass) FinancialPolicy reference resolution and snapshots > rejects a reference with different roundId [0.10ms]
+(pass) FinancialPolicy reference resolution and snapshots > rejects a reference with different externalTransactionId [0.11ms]
+(pass) FinancialPolicy reference resolution and snapshots > rejects a reference in another currency [0.17ms]
+(pass) FinancialPolicy reference resolution and snapshots > WIN may reference a BET with a different amount and gameId [0.34ms]
+(pass) FinancialPolicy reference resolution and snapshots > BET terminal snapshot retains the historical balance after later movements [0.45ms]
+(pass) FinancialPolicy reference resolution and snapshots > WIN terminal snapshot retains the historical balance after later movements [0.29ms]
+(pass) FinancialPolicy reference resolution and snapshots > REJECTED terminal snapshot is likewise stable after wallet changes [0.45ms]
+(pass) FinancialPolicy reference resolution and snapshots > invalid processing timestamp leaves both original objects unchanged [0.28ms]
+(pass) Money > adds decimal cents exactly and serializes as strings [0.29ms]
+(pass) Money > handles values above the JavaScript safe integer limit exactly [0.15ms]
+(pass) Money > subtracts, negates and normalizes signed zero [0.11ms]
+(pass) Money > compares and checks equality exactly [0.06ms]
+(pass) Money > rejects external amount "" without rounding [0.12ms]
+(pass) Money > rejects external amount " " without rounding [0.02ms]
+(pass) Money > rejects external amount "NaN" without rounding [0.01ms]
+(pass) Money > rejects external amount "Infinity" without rounding
+(pass) Money > rejects external amount "-Infinity" without rounding
+(pass) Money > rejects external amount "1e2" without rounding
+(pass) Money > rejects external amount "1E+2" without rounding
+(pass) Money > rejects external amount "1.001" without rounding
+(pass) Money > rejects external amount "1.005" without rounding
+(pass) Money > rejects external amount "1" without rounding
+(pass) Money > rejects external amount "1.0" without rounding
+(pass) Money > rejects external amount "01.00" without rounding
+(pass) Money > rejects external amount "+1.00" without rounding
+(pass) Money > rejects external amount " 1.00" without rounding
+(pass) Money > rejects external amount "1.00 " without rounding
+(pass) Money > rejects external amount "1,00" without rounding
+(pass) Money > rejects external amount ".10" without rounding
+(pass) Money > rejects external amount "0x10" without rounding
+(pass) Money > rejects external amount "-1.00" without rounding [0.02ms]
+(pass) Money > rejects external amount "-0.00" without rounding
+(pass) Money > rejects numeric JSON input at runtime [0.04ms]
+(pass) Money > rejects input and arithmetic overflow [0.14ms]
+(pass) Money > rejects currency mismatch in add [0.06ms]
+(pass) Money > rejects currency mismatch in subtract [0.02ms]
+(pass) Money > rejects currency mismatch in equals [0.03ms]
+(pass) Money > rejects currency mismatch in isLessThan [0.01ms]
+(pass) Money > rejects invalid currency "brl" [0.06ms]
+(pass) Money > rejects invalid currency " BRL" [0.02ms]
+(pass) Money > rejects invalid currency "BR" [0.01ms]
+(pass) Money > rejects invalid currency "FAKE"
+(pass) Money > rejects invalid currency "ZZZ"
+(pass) Money > rejects invalid currency ""
+(pass) Money > protects originals and serialized data against mutation [0.15ms]
+(pass) Money > does not inherit mutations to global Decimal precision [0.10ms]
+(pass) WagerTransaction > creates a pending immutable operation preserving identity [0.11ms]
+(pass) WagerTransaction > does not expose OPENING through the external factory [0.08ms]
+(pass) WagerTransaction > BET requires strictly positive money [0.09ms]
+(pass) WagerTransaction > WIN requires strictly positive money [0.03ms]
+(pass) WagerTransaction > REFUND requires strictly positive money [0.02ms]
+(pass) WagerTransaction > ROLLBACK requires strictly positive money [0.03ms]
+(pass) WagerTransaction > REFUND requires an external reference [0.07ms]
+(pass) WagerTransaction > ROLLBACK requires an external reference [0.03ms]
+(pass) WagerTransaction > LOSS accepts zero, affects no balance, and rejects negative input [0.10ms]
+(pass) WagerTransaction > allows PENDING to PROCESSED, REJECTED or FAILED [0.09ms]
+(pass) WagerTransaction > allows PENDING_REFERENCE to wait, process, reject or fail without a backwards transition [0.05ms]
+(pass) WagerTransaction > rejects waiting without a reference and processing without its resolved ID [0.16ms]
+(pass) WagerTransaction > rejects a self-reference in the provider namespace [0.04ms]
+(pass) WagerTransaction > PROCESSED rejects every subsequent transition and remains unchanged [0.18ms]
+(pass) WagerTransaction > REJECTED rejects every subsequent transition and remains unchanged [0.07ms]
+(pass) WagerTransaction > FAILED rejects every subsequent transition and remains unchanged [0.05ms]
+(pass) WagerTransaction > terminal result is JSON-safe and deeply immutable with the original observed balance [0.11ms]
+(pass) WagerTransaction > rehydrates a persisted terminal result without running a transition [0.16ms]
+(pass) WagerTransaction > protects timestamps from aliases and rejects invalid instants [0.16ms]
+(pass) WagerTransaction > rejects invalid identifiers, hashes, versions and processed snapshot currency [0.15ms]
+(pass) WalletLedgerEntry > records exact debit and credit equations [0.29ms]
+(pass) WalletLedgerEntry > rejects an unbalanced entry [0.16ms]
+(pass) WalletLedgerEntry > rejects zero, negative amount, negative balance and invalid version [0.29ms]
+(pass) WalletLedgerEntry > rejects mixed currencies [0.13ms]
+(pass) WalletLedgerEntry > protects money, fields and timestamp from mutation [0.18ms]
+(pass) Wallet > opens with initial balance and version one [0.10ms]
+(pass) Wallet > debits and returns the paired ledger without mutating original [0.17ms]
+(pass) Wallet > credits exactly and increments version [0.12ms]
+(pass) Wallet > allows debit of the exact balance [0.11ms]
+(pass) Wallet > rejects insufficient funds while preserving state [0.15ms]
+(pass) Wallet > credit of zero is a no-op with no ledger/version/timestamp change [0.09ms]
+(pass) Wallet > credit rejects negative values and a different currency [0.14ms]
+(pass) Wallet > debit of zero is a no-op with no ledger/version/timestamp change [0.04ms]
+(pass) Wallet > debit rejects negative values and a different currency [0.06ms]
+(pass) Wallet > rejects negative opening, bad version and backwards timestamps [0.29ms]
+(pass) Wallet > copies dates and prevents public property mutation [0.15ms]
+(pass) Wallet > rehydrates without incrementing version or generating a movement [0.05ms]
+(pass) Structured financial reconciliation diagnostics > reconciles zero opening and a complete history with refund/rollback/loss/rejection [1.44ms]
+(pass) Structured financial reconciliation diagnostics > historical totals exceeding one wallet range remain exact decimal strings [0.75ms]
+(pass) Structured financial reconciliation diagnostics > reports version gaps and duplicate entries without repairing the original wallet [0.78ms]
+(pass) Structured financial reconciliation diagnostics > reports broken equation and balance chain [0.18ms]
+(pass) Structured financial reconciliation diagnostics > reports mismatched currency without throwing a Money comparison error [0.16ms]
+(pass) Structured financial reconciliation diagnostics > reports missing transaction and missing entry independently [0.21ms]
+(pass) Structured financial reconciliation diagnostics > reports materialized balance mismatch [0.19ms]
+(pass) Canonical payload hash v1 > property order is irrelevant and absent reference is canonicalized to null [0.12ms]
+(pass) Canonical payload hash v1 > key is compared separately while financial identity/amount/reference changes alter the hash [0.08ms]
+ 176 pass
+ 0 fail
+ 1545 expect() calls
+Ran 176 tests across 12 files. [2.19s]
+
+=== Integracao: resultados individuais e evidencias JSON ===
+ Image jungle-financial-test-155e0211-queues Built
+ Image jungle-financial-test-155e0211-tests Built
+(pass) Stage 1 with real PostgreSQL and LocalStack > connects to PostgreSQL and executes a real transaction [12.27ms]
+(pass) Stage 1 with real PostgreSQL and LocalStack > runs versioned migrations up/down/up on a freshly created disposable database [66.91ms]
+(pass) Stage 1 with real PostgreSQL and LocalStack > connects to SQS and verifies FIFO, DLQ ARN, redrive and visibility timeout [53.94ms]
+(pass) Stage 1 with real PostgreSQL and LocalStack > serves public liveness and readiness with real dependencies [156.13ms]
+(pass) Stage 1 with real PostgreSQL and LocalStack > readiness fails for an unreachable PostgreSQL while real SQS stays healthy [69.99ms]
+(pass) Stage 1 with real PostgreSQL and LocalStack > readiness fails for an unreachable SQS while real PostgreSQL stays healthy [46.28ms]
+(pass) Stage 1 with real PostgreSQL and LocalStack > readiness fails if required queues do not exist [48.13ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > all three replicas serve unchanged public health checks and safe tracing headers [161.34ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > wallet opening/reading serializes exact money and string versions, including zero opening [125.00ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > concurrent duplicate wallet opening across replicas yields 201 and 409, one wallet only [32.06ms]
+{"scenario":"http_historical_replay","observedAfterBet":"80.00","currentAfterWin":"130.00","replayBalance":"80.00","ledgerEntries":3}
+(pass) Stage 4 real HTTP API across three independent Nest processes > mandatory historical replay returns 80.00 while actual balance stays 130.00 with three ledger entries [202.00ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > BET rejection is 422 with persistent snapshot; WIN/LOSS/REFUND/ROLLBACK use the original domain [142.65ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > invalid reference kind/context/amount and reversal insufficient funds are auditable 422 responses [122.91ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > idempotency header is mandatory and the sole source; payload/key/identity conflicts are 409 [80.81ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > duplicate Idempotency-Key header is rejected instead of silently merging identities [23.78ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > pending-reference replay is 202 until an internal test transaction completes it, then replays the terminal snapshot [160.46ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > terminal rejection and permanent FAILED replay preserve status/failure/snapshot without new effects [80.99ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > durably PENDING transaction returns 202 and current GET state without reprocessing [27.09ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > ledger keyset pagination keeps a fixed upper version while inserts occur, across replicas [121.70ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > HTTP concurrency: two 80.00 BETs over 100.00 yield 200/422 and one debit [53.00ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > HTTP concurrency: 50 identical requests across three replicas yield one transaction/debit [152.20ms]
+{"scenario":"50_http_duplicates_3_replicas","attempts":50,"processIds":[31,53,77],"backendPids":[100,101,102],"distinctTransactions":1,"debits":1,"balance":"90.00"}
+(pass) Stage 4 real HTTP API across three independent Nest processes > HTTP concurrency: global key across wallets and simultaneous REFUND/ROLLBACK never duplicate effects [185.11ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > HTTP concurrency: independent wallet commits while another wallet remains locked [66.40ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > HTTP real PostgreSQL lock timeout is 503 without a permanent financial rejection [185.14ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > invalid DTOs, money, kinds and unknown fields are 400 without leaking the submitted secrets [26.14ms]
+(pass) Stage 4 real HTTP API across three independent Nest processes > missing resources are 404 and unknown internal/hash/idempotency data is absent from transaction GET [43.58ms]
+(pass) Stage 6 persistent pending-reference resolution > approved migration backfills legacy deadline, protects it and refuses history-erasing rollback [57.28ms]
+{"scenario":"refund_before_bet","pendingAck":true,"result":"PROCESSED","balance":"100.00","ledger":3}
+(pass) Stage 6 persistent pending-reference resolution > A: REFUND before BET is ACKed by SQS while pending and resolves automatically after BET [151.26ms]
+(pass) Stage 6 persistent pending-reference resolution > B: ROLLBACK before WIN performs the inverse movement using the original transaction [72.52ms]
+(pass) Stage 6 persistent pending-reference resolution > C: incompatible player, wallet, currency, round, amount and kind are rejected without an extra ledger [368.43ms]
+(pass) Stage 6 persistent pending-reference resolution > provider namespace never resolves a foreign transaction with the same external ID [61.77ms]
+(pass) Stage 6 persistent pending-reference resolution > D: a rejected reference terminates its pending reversal with REFERENCE_NOT_PROCESSED [50.50ms]
+(pass) Stage 6 persistent pending-reference resolution > a reference that exists but is still pending is rescheduled and an entire reference chain later resolves [109.41ms]
+(pass) Stage 6 persistent pending-reference resolution > a reference arriving after the persisted deadline cannot revive an expired reversal [65.31ms]
+(pass) Stage 6 persistent pending-reference resolution > E: TTL and attempt exhaustion persist REJECTED snapshots without a movement or duplicate pending event [101.40ms]
+{"scenario":"three_pending_workers","processes":[101,102,103],"backendPids":[138,139,140],"resolutions":1,"refundLedger":1}
+(pass) Stage 6 persistent pending-reference resolution > F: three independent scheduler processes racing one pending operation produce one conclusion [732.52ms]
+(pass) Stage 6 persistent pending-reference resolution > G: SIGKILL before commit rolls back wallet, ledger, status, attempts and outbox [1163.71ms]
+{"scenario":"pending_crash_after_commit","status":"PROCESSED","attempts":2,"refundLedger":1}
+(pass) Stage 6 persistent pending-reference resolution > H: SIGKILL after commit and restart never repeat the credit or terminal event [1037.50ms]
+{"scenario":"pending_http_historical_replay","terminalBalance":"100.00","currentBalance":"150.00","ledger":4}
+(pass) Stage 6 persistent pending-reference resolution > I: HTTP pending replay does not retry; terminal replay retains historical balance after later credit [113.30ms]
+(pass) Stage 6 persistent pending-reference resolution > J: restarting all workers resumes several persistent pending references without HTTP replays [2182.49ms]
+(pass) Stage 6 persistent pending-reference resolution > K: concurrent pending REFUND and ROLLBACK over one BET obey the approved single compensation policy [119.78ms]
+(pass) Stage 6 persistent pending-reference resolution > claim is recovered after SIGKILL and after a live abandoned session exceeds idle timeout [2326.86ms]
+(pass) Stage 6 persistent pending-reference resolution > a locked wallet is skipped while an independent pending wallet advances [146.92ms]
+(pass) Stage 6 persistent pending-reference resolution > real PostgreSQL lock timeout does not consume a financial attempt or reject a valid reference [187.13ms]
+(pass) Stage 6 persistent pending-reference resolution > scheduler commits with SQS unavailable and the publisher later delivers its durable events [1305.74ms]
+(pass) Stage 6 persistent pending-reference resolution > deadline is immutable, terminal work is excluded and metadata updates retain existing privileges [40.64ms]
+{"scenario":"sqs_50_duplicates","deliveries":50,"duplicates":49,"debits":1,"balance":"90.00"}
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > A: 50 deliveries bypassing broker dedup still produce one debit, one inbox and two command events [1773.29ms]
+{"scenario":"consumer_sigkill_after_commit","inbox":1,"debits":1,"redeliveryDuplicate":1}
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > B: SIGKILL after PostgreSQL commit before ACK redelivers and resolves through persistent inbox [3615.04ms]
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > C: failure after outbox/ledger writes rolls back everything; retry on a new process applies once [2493.17ms]
+{"scenario":"two_publishers","processIds":[587,608],"published":32,"uniqueEvents":32}
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > D: two independent publishers safely claim and publish events in wallet order [1599.78ms]
+{"scenario":"publisher_sigkill_after_send","eventId":"3e29471d-4d04-4e36-bb55-580fd8b83013","attempts":2,"recoveredByNewProcess":true}
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > E: publisher SIGKILL after send recovers expired lease with same event ID and fenced claim [4299.95ms]
+{"scenario":"three_sqs_consumers","processes":[676,677,678],"backendPids":[268,267,269],"independentWallets":9,"lockedWalletPreserved":true}
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > F: three consumer processes handle independent wallets while a locked wallet cannot advance [1219.46ms]
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > G: repeated infrastructure failure reaches real FIFO DLQ without financial or inbox effects [4860.72ms]
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > H: restart consumer and publisher with pending work recovers all events and preserves financial integrity [2339.86ms]
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > invalid envelopes and conflicting message IDs reach DLQ, while valid financial rejection is ACKed [10626.51ms]
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > LOSS and PENDING_REFERENCE emit their typed events without WalletBalanceChanged; uncertain commit is confirmed read-only [693.97ms]
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > event consumer persists dedup even when duplicate event delivery bypasses SQS deduplication [112.97ms]
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > expired outbox lease fences stale publishers and bounded attempts keep exhausted events durable [4277.17ms]
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > lost commit response is resolved from persistent inbox before ACK, without repeating financial work [809.19ms]
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > SIGTERM drains a locked in-flight operation and stops fetching the next command [799.60ms]
+(pass) Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO > compiled production worker entrypoints validate dependencies, process real work and shut down cleanly [1408.44ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > official migration up/down/up as owner; complete financial catalog restored [262.54ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > actual runtime role supports wallet opening, processed/rejected transactions, string NUMERIC and bigint versions [67.93ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > zero opening has no ledger; first credit uses version two; LOSS does not advance balance/version [55.42ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > A: simultaneous 80.00 debits against 100.00 yield one rejection and one debit [48.86ms]
+{"scenario":"50_duplicates_3_processes","attempts":50,"processes":[981,982,983],"independentBackendPids":[380,381,382],"distinctTransactions":1,"debits":1,"balance":"90.00"}
+(pass) Stage 3 financial integrity on real PostgreSQL > B: 50 duplicates across three real processes/pools have one financial effect and identical results [676.82ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > C: wallet B commits while wallet A is explicitly locked; no global serialization [30.58ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > D: injected failure immediately after wallet update rolls back all effects; retry applies once [30.31ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > E: concurrent REFUND/ROLLBACK over one BET produces one compensation only [40.55ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > terminal replay preserves original balance after later movements; conflicting payload/key/identity are explicit [35.46ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > global idempotency key conflict across independent wallets cannot produce two effects [28.85ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > pending-reference replay remains pending after reference arrives; no implicit worker [27.58ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > a durably PENDING record replays without processing; crossed identities are conflicts [32.85ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > reconciliation snapshot stays consistent while another connection commits; read session rejects writes [25.84ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > real deadlock retries the complete Unit of Work on a fresh transaction without financial effects [1078.45ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > real lock timeout returns transient unavailability and never persists a financial rejection [138.53ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > currency/player mismatch is an auditable rejection with the real wallet snapshot [27.75ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > runtime ledger UPDATE/DELETE/TRUNCATE and DDL/migration-history access are denied [11.69ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > owner cannot UPDATE/DELETE/TRUNCATE ledger without administratively disabling protection [13.66ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > money constraints reject negative/special/overflow/excess-scale values, including direct SQL [22.93ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > wallet identity/version and terminal records are protected by SQL, not just domain [41.26ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > wallet mutation without ledger fails at COMMIT and restores balance/version [17.60ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > PROCESSED transaction without its expected movement/ledger is refused at COMMIT [21.71ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > ledger for LOSS/PENDING/REJECTED/FAILED cannot commit, even with a valid numeric equation [47.33ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > ledger FK, equation, wallet currency and unique transaction/version are enforced by PostgreSQL [14.64ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > external identity and global key have SQL uniqueness independently of the replay adapter [22.96ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > SQL blocks invalid processed references, immutable identity, backward transition and forged snapshot [51.46ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > ROLLBACK of WIN can reject insufficient funds; ROLLBACK of REFUND does not reopen original BET [81.72ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > processed reversals have SQL uniqueness across types, and rejected/failed terminals cannot be edited [45.23ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > inbox/outbox prepared structures enforce immutable identities, final states and financial references [30.66ms]
+(pass) Stage 3 financial integrity on real PostgreSQL > wallet uniqueness and down with data are refused without losing history [19.14ms]
+ 91 pass
+ 0 fail
+ 1214 expect() calls
+Ran 91 tests across 5 files. [60.73s]
+ Container jungle-financial-test-155e0211-queues-1 Removed
+ Container jungle-financial-test-155e0211-postgres-1 Removed
+ Container jungle-financial-test-155e0211-localstack-1 Removed
+ Network jungle-financial-test-155e0211_default Removed
+
+=== Principal: consultas somente leitura, nao atualizado ===
+app|jungle-wagering-app-1|running|unhealthy
+app|jungle-wagering-app-2|running|unhealthy
+app|jungle-wagering-app-3|running|unhealthy
+localstack|jungle-wagering-localstack-1|running|healthy
+postgres|jungle-wagering-postgres-1|running|healthy
+migrate|jungle-wagering-migrate-1|exited|
+queues|jungle-wagering-queues-1|exited|
+Historico: Migration20261028000100
+awslocal sqs list-queues --region us-east-1: sem saida/lista de filas
+Consumers/publishers/schedulers: ausentes no compose ps --all
+APIs em imagem jungle-wagering:stage1; probes em logs: HTTP 503
+
+Observacao: extrato selecionado dos logs atuais e consultas desta auditoria.
+Logs completos locais ignorados: .cache-stage7-baseline-{build,unit,docker}.log

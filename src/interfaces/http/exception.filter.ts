@@ -20,6 +20,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     this.logger.write(status >= 500 ? 'error' : 'warn', 'http_request_failed', {
       correlationId, requestId, method: request.method, statusCode: status,
       errorName: exception instanceof Error ? exception.name : 'UnknownError',
+      errorCode: code, operation: request.method, result: 'failed',
+      ...response.locals['financialTrace'],
     });
     // Health responses expose only dependency states, never raw driver exceptions.
     if (exception instanceof HttpException && request.path === '/health/ready' && status === 503) {

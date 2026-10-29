@@ -2,10 +2,15 @@
 
 Distributed Wagering Processor em Bun, TypeScript strict e NestJS.
 
-**Estado: API financeira da Etapa 4 implementada e validada em PostgreSQL real.**
+**Estado: Etapa 7 — validação distribuída e observabilidade.**
+Resultado, matriz e evidências em [docs/stage-7/RESULT.md](docs/stage-7/RESULT.md).
 Há endpoints REST, DTOs validados, paginação estável do ledger, replay HTTP persistente,
 reconciliação e rastreamento de requests, reutilizando a unidade de trabalho ACID da Etapa 3.
-Não há consumer SQS, publisher, worker de referências ou autenticação externa.
+Consumer SQS FIFO e publisher separado usam inbox/outbox no mesmo commit financeiro,
+com retry, DLQ e recuperação após crash. Scheduler separado resolve referências pendentes
+com prazo persistido, backoff e orçamento de tentativas. Autenticação externa permanece
+fora do escopo. Contratos e operação: [docs/MESSAGING.md](docs/MESSAGING.md) e
+[docs/PENDING_REFERENCES.md](docs/PENDING_REFERENCES.md).
 
 Rotas, exemplos, status HTTP, paginação e idempotência em [docs/HTTP_API.md](docs/HTTP_API.md).
 
@@ -80,6 +85,15 @@ Variáveis relevantes:
 | SQS_QUEUE_NAME / SQS_DLQ_NAME | Nomes FIFO distintos |
 | SQS_MAX_RECEIVE_COUNT | Redrive após tentativas; padrão 5 |
 | SQS_VISIBILITY_TIMEOUT_SECONDS | Visibilidade da fila principal; padrão 30 |
+| SQS_EVENTS_QUEUE_NAME / SQS_EVENTS_DLQ_NAME | Fila FIFO de eventos e sua DLQ |
+| SQS_WAIT_SECONDS / CONSUMER_CONCURRENCY | Long polling (20s) e loops por consumer (4) |
+| MESSAGING_RETRY_BASE_SECONDS / MESSAGING_RETRY_CAP_SECONDS | Backoff com jitter; 1s/300s |
+| OUTBOX_BATCH_SIZE / OUTBOX_LEASE_SECONDS / OUTBOX_MAX_ATTEMPTS | Claim: 10 eventos, lease 30s, 20 tentativas |
+| OUTBOX_POLL_MS / WORKER_SHUTDOWN_TIMEOUT_MS | Polling 1000ms e drenagem 10000ms |
+| PENDING_REFERENCE_TTL_SECONDS / PENDING_REFERENCE_MAX_ATTEMPTS | Prazo inicial de 86400s; 20 avaliações totais |
+| PENDING_REFERENCE_BASE_SECONDS / PENDING_REFERENCE_CAP_SECONDS | Backoff de pendência: base 1s, teto 300s |
+| PENDING_REFERENCE_POLL_MS / PENDING_REFERENCE_BATCH_SIZE | Polling 1000ms; até 20 transações curtas por ciclo |
+| PENDING_REFERENCE_IDLE_TIMEOUT_MS | Timeout local de sessão ociosa dentro da tentativa: 10000ms |
 | POSTGRES_HOST_PORT / LOCALSTACK_HOST_PORT | Portas publicadas no host |
 | APP_HOST_PORT | Vazio/zero: porta dinâmica; valor fixo apenas para uma réplica |
 
@@ -103,10 +117,43 @@ migration ou sincronização roda em seu startup. `queues` cria automaticamente:
 - `wager-transactions.fifo`: FIFO, deduplicação explícita, visibilidade 30s,
   long polling 20s, retenção 4 dias, redrive para DLQ após 5 recebimentos.
 - `wager-transactions-dlq.fifo`: FIFO, retenção 14 dias.
+- `wager-events.fifo`: FIFO de eventos, mesmos parâmetros de polling, redrive e visibilidade.
+- `wager-events-dlq.fifo`: FIFO, retenção 14 dias; destinada a subscribers futuros.
 
 Os parâmetros de visibilidade/tentativas vêm das variáveis. Repetir a inicialização
 com os mesmos atributos é seguro; mudar atributos de filas existentes exige atualização
 operacional explícita, sem apagar mensagens silenciosamente.
+
+API, consumer e publisher são processos separados no Compose. `bun run stack:scale`
+inicia três APIs, três consumers, dois publishers e três schedulers de referências. Workers não expõem HTTP; seus logs
+registram início, falhas e snapshots de métricas a cada 10s. Para executar no host após
+bootstrap/migrations e `bun run queues:init`:
+
+```text
+bun run worker:consumer
+bun run worker:publisher
+bun run worker:pending-reference
+```
+
+A migration `20261029000100` concede escrita mínima de mensageria, permite o evento
+de referência pendente e acrescenta sequência de publicação e diagnóstico. Não
+reescreve migrations financeiras aprovadas. Seu rollback recusa inbox/outbox com dados.
+Os testes usam Compose e bancos descartáveis; não migram o banco de desenvolvimento.
+
+A migration `20261029000200`, aprovada para a Etapa 6, acrescenta prazo imutável de
+referência e seu índice/grant. **Antes do upgrade, drenar/parar os writers antigos**:
+
+```text
+docker compose stop app consumer publisher pending-reference
+bun run stack:scale
+```
+
+O novo schema exige deadline ao entrar em PENDING_REFERENCE; a versão antiga não pode
+continuar escrevendo durante esse upgrade. Pendências legadas recebem created_at + 24h
+e podem já estar vencidas quando o scheduler iniciar. A migration altera só metadados,
+sem liquidar pendências ou alterar saldo/ledger. Rollback recusa remover prazos históricos.
+Confira credenciais e jobs de bootstrap/migration descritos abaixo antes de atualizar um
+ambiente existente. Nenhum comando de upgrade no desenvolvimento foi executado pelos testes.
 
 O banco persiste no volume `postgres-data`. LocalStack pode reconstruir as filas
 no próximo `stack:up`; retenção persistente do broker não é oferecida nesta fundação.
@@ -214,6 +261,8 @@ bun run build
 bun run test
 bun run test:build
 bun run test:integration:docker
+bun run test:distributed:docker
+bun run test:load
 ```
 
 O build usa o compilador TypeScript executado pelo Bun, preservando os decorators e
@@ -242,6 +291,22 @@ um `DB_NAME` isolado e as conexões, inicialize as filas e execute
 testes não executados em sucesso/skip silencioso.
 
 Validação efetuada neste ambiente: consulte [VALIDATION.md](VALIDATION.md).
+
+A Etapa 7 acrescenta `docker-compose.distributed-test.yml`: três containers API,
+três consumers, dois publishers e três schedulers, PostgreSQL tmpfs e LocalStack
+exclusivos. `test:distributed:docker` verifica saúde/identidades, A–E, idempotência,
+SQS, SIGKILL/reinício de todos os papéis e carga. `test:load` reproduz só a carga em
+outro projeto descartável. Não usam portas publicadas, volumes compartilhados ou
+Docker socket montado. Ambos requerem Docker Engine acessível e geram evidências em
+`docs/stage-7/`; removem somente os próprios containers/rede, sem `down -v`.
+
+Os probes de workers desse ambiente são supervisores exclusivos da imagem de testes:
+verificam startup e heartbeat do processo de produção. Não são um novo endpoint do
+produto nem prova de progresso financeiro durante indisponibilidade de dependências.
+As APIs testam tabelas/colunas essenciais no readiness; namespace isolado não basta.
+Logs de API e workers emitem snapshots de métricas a cada 10s. Contadores financeiros
+registram transições confirmadas na UoW, sem contar replay, OPENING ou rollback como
+uma nova transação de provedor. São observações por processo, sem agregador externo.
 
 ## Troubleshooting
 

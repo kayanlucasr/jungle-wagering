@@ -82,7 +82,10 @@ Factories rehydrate fazem reconstrução estrutural, sem executar transições o
 LOSS é PROCESSED sem ledger ou alteração da wallet. Transação REJECTED ou FAILED
 também não gera lançamento. Falhas de programação/estado inválido são DomainError;
 rejeições de negócio retornam nova transação REJECTED com failureCode e snapshot.
-Referência ausente ou não terminal deixa PENDING_REFERENCE; TTL/retry não estão implementados.
+Referência ausente ou não terminal deixa PENDING_REFERENCE. Na Etapa 6, o scheduler
+reavalia com backoff e prazo persistido; TTL/orçamento esgotado gera REJECTED com
+REFERENCE_NOT_FOUND, sem ledger. FAILED permanece disponível no domínio para falha
+permanente aprovada, mas não é usado para expiração ou indisponibilidade transitória.
 
 ## Política adicional de segurança para reversões
 
@@ -157,8 +160,8 @@ As classes usam DomainError com FailureCode enum, independente de códigos HTTP.
 | Wallet de outro player | WALLET_PLAYER_MISMATCH |
 
 Mantidos os nomes específicos da Etapa 0 para saldo de reversão e duplicidade, em vez
-de introduzir sinônimos concorrentes. REFERENCE_NOT_FOUND está disponível para futura
-expiração de referência; a política atual mantém referência inexistente pendente.
+de introduzir sinônimos concorrentes. REFERENCE_NOT_FOUND identifica expiração ou
+esgotamento de referência na Etapa 6. Antes desses limites, a referência permanece pendente.
 
 ## Resultado terminal e futuro replay persistente
 

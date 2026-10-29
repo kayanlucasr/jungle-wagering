@@ -1,6 +1,8 @@
 import type { Wallet } from '../../domain/wallet/wallet';
 import type { WagerTransaction } from '../../domain/wagering/wager-transaction';
 import type { WalletLedgerEntry } from '../../domain/ledger/wallet-ledger-entry';
+import type { InboxRepository, OutboxRepository } from '../messaging/ports';
+import type { PendingReferenceRepository, ReferenceSchedule } from '../pending-reference/ports';
 
 export interface WalletRepository {
   find(id: string, lock?: boolean): Promise<Wallet | undefined>;
@@ -16,7 +18,7 @@ export interface TransactionRepository {
   findByWallet(walletId: string): Promise<readonly WagerTransaction[]>;
   insertPending(transaction: WagerTransaction): Promise<boolean>;
   insertOpening(transaction: WagerTransaction): Promise<void>;
-  save(transaction: WagerTransaction, attemptedAt: Date): Promise<void>;
+  save(transaction: WagerTransaction, attemptedAt: Date, schedule?: ReferenceSchedule): Promise<void>;
 }
 
 export interface LedgerRepository {
@@ -30,6 +32,9 @@ export interface FinancialSession {
   readonly wallets: WalletRepository;
   readonly transactions: TransactionRepository;
   readonly ledger: LedgerRepository;
+  readonly inbox: InboxRepository;
+  readonly outbox: OutboxRepository;
+  readonly pendingReferences: PendingReferenceRepository;
 }
 
 export interface FinancialUnitOfWork {

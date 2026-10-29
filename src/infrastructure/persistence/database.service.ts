@@ -25,6 +25,12 @@ export class DatabaseService implements OnApplicationShutdown {
       "select exists(select 1 from pg_namespace where nspname = 'wagering') as ready",
     );
     if (result[0]?.ready !== true) throw new Error('SchemaNotMigrated');
+    // Parse/access the runtime's required tables and latest operational columns. No rows,
+    // owner access to migration history, locks or financial writes are required.
+    await this.orm.em.fork().execute(`select w.balance, w.version, t.result_balance,
+      t.reference_deadline_at, l.wallet_version, i.processed_at, o.position, o.last_error_code
+      from wagering.wallets w, wagering.wager_transactions t, wagering.wallet_ledger_entries l,
+      wagering.inbox_messages i, wagering.outbox_messages o limit 0`);
   }
 
   async onApplicationShutdown(): Promise<void> {

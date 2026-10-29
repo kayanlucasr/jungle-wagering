@@ -5,6 +5,9 @@ import { FinancialError } from '../../application/financial/errors';
 import { PostgresWalletRepository } from './repositories/wallet-repository';
 import { PostgresTransactionRepository } from './repositories/transaction-repository';
 import { PostgresLedgerRepository } from './repositories/ledger-repository';
+import { PostgresInboxRepository, PostgresOutboxRepository } from './repositories/message-repositories';
+import { PostgresPendingReferenceRepository } from './repositories/pending-reference-repository';
+import { FinancialMetrics } from '../observability/financial-metrics';
 
 /** Driver exceptions sometimes wrap the PostgreSQL error. Never classify by message text. */
 export function sqlState(error: unknown): string | undefined {
@@ -22,33 +25,49 @@ export function sqlState(error: unknown): string | undefined {
 function transient(error: unknown): boolean {
   const code = sqlState(error);
   return code === '40P01' || code === '40001' || code === '55P03' || code === '57014'
+    || code === '25P03' || code === '57P01' || code === '57P02' || code === '57P03'
     || code?.startsWith('08') === true || ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE'].includes(code ?? '')
     || (error instanceof Error && error.name === 'KnexTimeoutError');
 }
 
 export class PostgresFinancialUnitOfWork implements FinancialUnitOfWork {
-  constructor(private readonly orm: MikroORM) {}
+  constructor(private readonly orm: MikroORM, readonly metrics = new FinancialMetrics()) {}
 
   async write<T>(work: (session: FinancialSession) => Promise<T>): Promise<T> {
+    const started = performance.now();
     for (let attempt = 0; ; attempt += 1) {
       let workCompleted = false;
+      const statuses: string[] = [];
       try {
         // Promise resolves only AFTER commit, including all deferred constraint triggers.
-        return await this.orm.em.fork().transactional(async (em) => {
+        const value = await this.orm.em.fork().transactional(async (em) => {
           await this.assertRuntime(em);
-          const result = await work(this.session(em));
+          const session = this.session(em);
+          const save = session.transactions.save.bind(session.transactions);
+          session.transactions.save = async (transaction, at, schedule) => {
+            const previous = await session.transactions.find(transaction.id);
+            await save(transaction, at, schedule);
+            if (previous?.status !== transaction.status) statuses.push(transaction.status);
+          };
+          const result = await work(session);
           workCompleted = true;
           return result;
         }, {
           isolationLevel: IsolationLevel.READ_COMMITTED,
         });
+        this.metrics.committed(statuses, performance.now() - started);
+        return value;
       } catch (error: unknown) {
         const code = sqlState(error);
+        if (error instanceof FinancialError && error.code === 'IDEMPOTENCY_CONFLICT') this.metrics.idempotencyConflicts += 1;
+        if (code === '40P01' || code === '55P03' || code === '40001') this.metrics.lockConflicts += 1;
         if ((code === '40P01' || code === '40001') && attempt < 2) {
+          this.metrics.retries += 1;
           await new Promise((resolve) => setTimeout(resolve, 10 + Math.floor(Math.random() * 30)));
           continue;
         }
         if (transient(error)) {
+          this.metrics.transientFailures += 1;
           throw new FinancialError('PERSISTENCE_UNAVAILABLE');
         }
         if (code?.startsWith('23')) throw new FinancialError('PERSISTENCE_INTEGRITY');
@@ -75,7 +94,8 @@ export class PostgresFinancialUnitOfWork implements FinancialUnitOfWork {
 
   private session(em: EntityManager): FinancialSession {
     return { wallets: new PostgresWalletRepository(em), transactions: new PostgresTransactionRepository(em),
-      ledger: new PostgresLedgerRepository(em) };
+      ledger: new PostgresLedgerRepository(em), inbox: new PostgresInboxRepository(em),
+      outbox: new PostgresOutboxRepository(em), pendingReferences: new PostgresPendingReferenceRepository(em) };
   }
 
   private async assertRuntime(em: EntityManager): Promise<void> {

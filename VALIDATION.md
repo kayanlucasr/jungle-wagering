@@ -806,3 +806,412 @@ erro não foram contabilizadas como sucesso. Nenhuma dependência/DDL/grant foi 
 - Para a Etapa 5: integrar inbox/outbox na mesma UoW, revisar grants específicos, implementar
   os workers autorizados e testar redelivery, crash após commit/antes do ack, publicação
   concorrente e pending references. Nenhum desses componentes foi iniciado automaticamente.
+
+## Entrega e validação da Etapa 5 — 29/10/2026
+
+O usuário autorizou a Etapa 5 após o plano e a inspeção inicial. A base foi reexecutada
+antes da implementação: 167 testes unitários (1.505 assertions) e 56 de integração
+(735 assertions), todos aprovados. As aprovações das migrations financeiras das Etapas
+3/4 foram confirmadas no histórico documentado. A aplicação das migrations e os grants
+foram verificados em PostgreSQL real descartável, usando owner e runtime separados.
+
+### Implementação e contratos
+
+- O mesmo FinancialService atende HTTP e SQS; FinancialSession agora contém inbox/outbox
+  no mesmo contexto SQL dos repositories financeiros. Não foi criado outro motor financeiro.
+- PK persistente `(consumer_name,message_id)`, hash de envelope canônico, comparação de
+  identidade e conclusão do inbox no commit financeiro. Replay não cria novo ledger/evento.
+- Quatro subclasses de IntegrationEvent: WagerTransactionProcessed, WagerTransactionRejected,
+  WalletBalanceChanged e WagerTransactionPendingReference. IDs/JSON persistidos não mudam
+  nas tentativas de publicação. Abertura positiva também emite eventos; LOSS/rejeição não
+  emitem mudança de saldo. Abertura zero não emite eventos.
+- Consumer usa SDK AWS v3, long polling, concorrência configurável, agrupamento por wallet,
+  heartbeat de visibilidade, ACK depois de commit confirmado e consulta ao inbox após
+  resposta de commit perdida. Invalid/permanent/temporary/business rejection são distintos.
+- Publisher separado usa SKIP LOCKED, owner/attempt/lease e marcação condicionada ao claim
+  vigente. Rede SQS fica fora das transações PostgreSQL. Eventos são sequenciados por wallet;
+  um evento pendente/esgotado não pode ser ultrapassado na mesma wallet.
+- Retry exponencial com equal jitter e limites configuráveis. Mensagens esgotadas vão à
+  FIFO DLQ; redrive nativo cobre falhas anteriores à transferência explícita. Falhas de
+  publicação esgotadas ficam duráveis na outbox, com métrica própria e recuperação operacional.
+- SIGTERM/SIGINT interrompem polling e drenam trabalho, com prazo no entrypoint; SIGKILL
+  recupera por redelivery e expiração de lease. Logs JSON e métricas por processo, sem payloads.
+
+Contratos JSON, configuração FIFO/DLQ, taxonomia operacional, limites e procedimento de
+reprocessamento estão em [docs/MESSAGING.md](docs/MESSAGING.md).
+
+### Migration e privilégios reais
+
+Migration `20261029000100` registrada no migrator oficial. Não altera o SQL aprovado da
+Etapa 3: acrescenta position identity/índice de ordenação e last_error_code na outbox;
+concede INSERT em inbox/outbox e UPDATE apenas nas colunas operacionais indicadas no DDL;
+ajusta check_message_reference para permitir o evento PENDING_REFERENCE. Ledger permanece
+imutável e runtime não recebe DELETE/TRUNCATE/DDL nem acesso ao histórico de migrations.
+
+Up/down/up das migrations 002/003 foi executado como owner e restaurou as cinco tabelas
+e vinte triggers. Grants foram consultados e usados com login runtime não administrativo;
+DELETE/TRUNCATE de inbox/outbox e mutações de ledger continuaram recusados. Os testes de
+constraints, locks, snapshots, reversões e idempotência das etapas anteriores passaram.
+O down da migration nova exige inbox/outbox vazios e não apaga eventos para viabilizar rollback.
+
+### Arquivos criados
+
+```text
+docs/MESSAGING.md
+src/application/messaging/command-envelope.ts
+src/application/messaging/integration-event.ts
+src/application/messaging/ports.ts
+src/infrastructure/messaging/outbox-publisher.ts
+src/infrastructure/messaging/queue-setup.ts
+src/infrastructure/messaging/retry.ts
+src/infrastructure/messaging/transaction-consumer.ts
+src/infrastructure/observability/messaging-metrics.ts
+src/infrastructure/persistence/migrations/Migration20261029000100.ts
+src/infrastructure/persistence/outbox-store.ts
+src/infrastructure/persistence/repositories/message-repositories.ts
+src/workers/main.ts
+test/integration/messaging.test.ts
+test/support/messaging-process.ts
+test/unit/messaging.test.ts
+```
+
+### Arquivos modificados
+
+```text
+.env.example
+ARCHITECTURE.md
+README.md
+VALIDATION.md
+docker-compose.yml
+package.json
+scripts/init-queues.ts
+src/application/financial/financial-service.ts
+src/application/financial/ports.ts
+src/infrastructure/config/environment.ts
+src/infrastructure/messaging/sqs.service.ts
+src/infrastructure/observability/json-logger.ts
+src/infrastructure/persistence/financial-unit-of-work.ts
+src/infrastructure/persistence/orm-options.ts
+src/interfaces/http/transactions.controller.ts
+src/interfaces/http/wallets.controller.ts
+test/integration/financial.test.ts
+```
+
+Nenhum arquivo foi removido; nenhuma dependência foi adicionada ou atualizada. bun.lock,
+domínio financeiro e SQL aprovado da Etapa 3 foram preservados. dist foi regenerado e
+continua ignorado. O teste legado de grants agora verifica a escrita autorizada na Etapa 5
+e a proibição de DELETE/TRUNCATE. A fixture de evento usa um tipo próprio para continuar
+testando imutabilidade/unique sem colidir com WalletBalanceChanged gerado automaticamente.
+
+### Cenários reais de mensageria
+
+| Cenário | Resultado executado |
+|---|---|
+| A — 50 duplicatas | DeduplicationIds de transporte diferentes forçaram 50 entregas; 49 replays, um inbox, um débito, saldo 90.00 e dois eventos da operação. |
+| B — crash do consumer | Processo recebeu SIGKILL após commit e antes de ACK. Novo processo detectou duplicata persistente; um inbox e um débito. |
+| C — falha pré-commit | Erro injetado após todas as escritas financeiras/outbox; rollback deixou saldo 100.00, nenhum inbox/transação/débito da aposta. Novo processo aplicou uma vez, saldo 90.00. |
+| D — dois publishers | Processos iniciados por uma barreira simultânea, ambos publicaram; 32 eventos únicos, sequência crescente por wallet, sem claim incorreto. |
+| E — crash do publisher | SIGKILL depois do SendMessage e antes de published_at; novo publisher recuperou lease expirado, mesmo eventId/payload e attempts=2. |
+| F — três consumers | Três processos/pools/backend PIDs distintos; nove wallets concluíram enquanto outra estava sob lock externo. Depois do unlock, todos os históricos reconciliaram com um débito por wallet. |
+| G — DLQ | Falhas pré-commit repetidas atingiram FIFO DLQ com corpo/identificadores e ErrorCode preservados; nenhum efeito financeiro parcial ou inbox confirmado. |
+| H — reinício | Consumers/publishers parados e recriados com comandos/eventos pendentes; quatro eventos publicados e saldo/ledger íntegros. |
+| Envelope e conflito | Dinheiro number, schema inválido e messageId com payload divergente foram para DLQ; REJECTED financeiro válido recebeu ACK e não gerou evento de saldo. |
+| LOSS e referência | Eventos tipados corretos; saldo/versão sem alteração; referência permaneceu pendente, sem antecipar worker da Etapa 6. |
+| Subscriber idempotente | Entregas duplicadas de eventId via SQS com DeduplicationIds diferentes produziram uma única linha de projeção, usando inbox SQL na mesma transação e sem UNIQUE na projeção. |
+| Lease e orçamento | Publisher antigo não conseguiu marcar/reagendar claim expirado; orçamento esgotado permaneceu durável e pôde ser recuperado com orçamento explicitamente maior. |
+| Commit incerto | Commit real seguido de resposta simulada como indisponível foi resolvido por consulta ao inbox antes do ACK, sem repetir movimento. |
+| SIGTERM em voo | Worker aguardou operação bloqueada, concluiu commit/ACK após unlock e não buscou o comando seguinte. |
+| Entrypoints compilados | Consumer e publisher de dist validaram dependências, processaram trabalho real e encerraram com worker_stopped e exit 0. |
+
+Evidências da execução oficial final:
+
+```json
+{"scenario":"sqs_50_duplicates","deliveries":50,"duplicates":49,"debits":1,"balance":"90.00"}
+{"scenario":"consumer_sigkill_after_commit","inbox":1,"debits":1,"redeliveryDuplicate":1}
+{"scenario":"two_publishers","processIds":[210,231],"published":32,"uniqueEvents":32}
+{"scenario":"publisher_sigkill_after_send","eventId":"2ca28e30-a9d1-4b58-a2db-a138db40fe16","attempts":2,"recoveredByNewProcess":true}
+{"scenario":"three_sqs_consumers","processes":[294,295,296],"backendPids":[204,205,206],"independentWallets":9,"lockedWalletPreserved":true}
+```
+
+### Comandos e resultados finais
+
+O Bun local foi localizado em `.tools/package/bin/bun.exe`; os comandos abaixo foram
+executados por esse binário, usando a mesma versão 1.4.4 da imagem Docker:
+
+```text
+bun run test:build
+bun test test/unit
+bun run test:integration:docker
+docker compose config --quiet
+git diff --check
+```
+
+| Verificação | Resultado |
+|---|---|
+| Typecheck strict | Aprovado, inclusive no build Docker |
+| Build e smoke compilado | Aprovados; live=200, ready sem dependências=503, término por sinal exit 143 |
+| Unitários | 172 pass, 0 fail, 1.531 assertions |
+| Integração real | 71 pass, 0 fail, 996 assertions |
+| Composição das integrações | 7 fundação + 30 financeiras + 19 HTTP + 15 mensageria |
+| Total | 243 testes, 0 falhas, 2.527 assertions |
+| Compose | Configuração válida com API/consumer/publisher separados |
+
+O runner final usou `jungle-financial-test-83237743`, PostgreSQL 17.11-alpine em tmpfs e
+LocalStack 4.12.0. Finalizou com exit 0 e removeu seus containers/rede. O projeto de
+iteração `jungle-stage5-validation` também foi removido. Nenhum down -v foi usado.
+Logs locais ignorados: `.cache-stage5-final-unit.log` e `.cache-stage5-final-docker.log`.
+
+### Intercorrências, riscos e Etapa 6
+
+- O Docker ficou indisponível durante o desenvolvimento, com status stopped e start
+  contraditório; foi recuperado com Docker Desktop restart. A execução oficial posterior
+  foi feita em infraestrutura descartável nova. A causa interna do backend não foi confirmada.
+- Smoke local inicial teve EPERM ao criar subprocesso no sandbox; a repetição fora dele
+  passou. A primeira integração com mudanças teve uma fixture legada colidindo com o
+  evento real, corrigida antes do resultado final. Nenhuma falha intermediária foi contada
+  como sucesso e não houve rejeição de revisão automática de aprovação.
+- Três consumers e dois publishers foram processos Bun independentes dentro do container
+  de testes; não se apresenta isso como cinco containers. O Compose de desenvolvimento
+  está configurado para escalar serviços separados, mas não foi atualizado por esses testes.
+- `.env`, volume e schema de desenvolvimento não foram migrados ou alterados por esta
+  entrega. O restart do Docker reiniciou o Engine; os testes não apagaram seus dados.
+- A perda de resposta após commit é injetada após um commit PostgreSQL real; não houve
+  falha física de rede exatamente durante COMMIT. A duplicação além da janela do broker
+  foi simulada por DeduplicationIds diferentes, sem esperar a janela de cinco minutos.
+- Subscribers de produto não foram criados. O consumidor de eventos usado para comprovar
+  dedup é um harness de projeção transacional; integrações futuras devem persistir eventId.
+- Tentativas de publicação são limitadas; evento esgotado bloqueia sua wallet até intervenção,
+  sem descarte. Métricas são locais ao processo, sem agregador/exporter, carga ou SLO.
+- Autenticação externa permanece pendente. Não houve backfill de eventos anteriores.
+- Etapa 6 não foi iniciada: worker avançado de referências, backoff/TTL de pendências e
+  desfecho por referência inexistente continuam pendentes de implementação específica.
+
+## Entrega e validação da Etapa 6 — 29/10/2026
+
+Esta seção substitui a pendência da Etapa 6 registrada acima. O usuário aprovou o plano
+e o DDL completos de docs/stage-6/. A base foi reexecutada antes da implementação: build,
+typecheck, smoke, 172 testes unitários e 71 integrações, todos aprovados. O plano adotou
+claim transacional wallet → transaction, sem lease adicional, e expiração REJECTED conforme
+o item 7.1 do enunciado. Não houve autorização ou avanço para a Etapa 7.
+
+### Implementação e arquivos
+
+Criados na preparação e implementação desta etapa:
+
+```text
+docs/PENDING_REFERENCES.md
+docs/stage-6/REVIEW.md
+docs/stage-6/01-pending-reference-up.proposed.sql
+docs/stage-6/02-pending-reference-down.proposed.sql
+src/application/pending-reference/policy.ts
+src/application/pending-reference/ports.ts
+src/infrastructure/observability/pending-reference-metrics.ts
+src/infrastructure/pending-reference/reference-scheduler.ts
+src/infrastructure/persistence/migrations/Migration20261029000200.ts
+src/infrastructure/persistence/migrations/pending-reference-sql.ts
+src/infrastructure/persistence/repositories/pending-reference-repository.ts
+test/integration/pending-reference.test.ts
+test/support/pending-reference-process.ts
+test/unit/pending-reference.test.ts
+```
+
+Modificados nesta etapa, sobre o estado da Etapa 5 já existente no workspace:
+
+```text
+.env.example
+ARCHITECTURE.md
+README.md
+VALIDATION.md
+docker-compose.yml
+docs/DOMAIN.md
+docs/MESSAGING.md
+package.json
+src/app.module.ts
+src/application/financial/financial-service.ts
+src/application/financial/ports.ts
+src/infrastructure/config/environment.ts
+src/infrastructure/observability/json-logger.ts
+src/infrastructure/persistence/entities/financial-records.ts
+src/infrastructure/persistence/financial-unit-of-work.ts
+src/infrastructure/persistence/mappers/financial-mappers.ts
+src/infrastructure/persistence/orm-options.ts
+src/infrastructure/persistence/repositories/transaction-repository.ts
+src/workers/main.ts
+test/integration/financial.test.ts
+```
+
+As mudanças não commitadas da Etapa 5 foram preservadas. Nenhuma dependência foi adicionada,
+nenhum arquivo foi removido, bun.lock e as migrations anteriores permaneceram inalterados.
+O teste financeiro de up/down/up inclui a migration nova e agora verifica vinte e um triggers.
+
+### Arquitetura, estados, locks e eventos
+
+FinancialService.submit e resolveNextPendingReference compartilham evaluate/persistDecision
+e a FinancialPolicy existente. A resolução reidrata a mesma transação e nunca cria outra
+identidade. Claim por FOR UPDATE OF wallet SKIP LOCKED com EXISTS MVCC, seguido de lock
+da transação elegível daquela wallet. Referência/histórico são leituras MVCC, sem travar
+outra wallet. Scheduler não trava inbox e publisher não solicita wallet durante claim.
+
+Claim e decisão ficam no mesmo commit SQL curto. Não há sleep, espera por referência ou
+chamada SQS dentro dele. Rollback libera o claim; idle_in_transaction_session_timeout
+local cobre sessão abandonada. Não se adicionou lease persistente nem um contador fictício
+de leases recuperados. Os testes comprovam recuperação de lock após crash e timeout mesmo
+com o processo antigo ainda vivo. Polling e backoff de infraestrutura ficam fora da UoW.
+
+PENDING_REFERENCE pode permanecer pendente ou concluir como PROCESSED/REJECTED. Não há
+regressão para PENDING nem transição de terminal. FAILED não representa expiração ou erro
+transitório nesta implementação. Referências rejeitadas/incompatíveis usam os códigos
+existentes da FinancialPolicy; TTL/orçamento usam REJECTED/REFERENCE_NOT_FOUND.
+
+Defaults aprovados: TTL de 24h, 20 avaliações totais incluindo o aceite inicial, backoff
+base 1s/cap 300s com equal jitter, polling 1s e lote de 20 transações independentes.
+Deadline persistido não é estendido por mudança de configuração. A última avaliação antes
+do deadline pode resolver; se ainda pendente, esgotar o orçamento rejeita. Deadline vencido
+prevalece sobre referência tardia. Falha de infraestrutura faz rollback e não consome
+avaliação financeira. Next_attempt_at é limpo ao terminalizar, no mesmo UPDATE do snapshot.
+
+WagerTransactionPendingReference é emitido só na entrada. Processed/Rejected e, quando
+há ledger, WalletBalanceChanged são inseridos atomicamente na conclusão. Event IDs da
+outbox permanecem estáveis. Correlação original vem do evento de pendência persistido;
+legado sem esse evento usa pending-<md5(transactionId)> como fallback determinístico.
+Replays HTTP/SQS não iniciam avaliação e retornam o snapshot histórico após terminal.
+
+### Migration executada e privilégios
+
+Migration 20261029000200 acrescenta reference_deadline_at, CHECK de consistência, trigger
+de imutabilidade, índice parcial e UPDATE da coluna nova. Não modifica triggers financeiros
+anteriores ou a política de reversão. O teste construiu uma pendência real no schema da
+Etapa 5, aplicou a migration, conferiu backfill de created_at + 24h e reagendamento, sem
+movimento/alteração de status na migration. Down com prazo histórico foi recusado e o
+registro ficou intacto. Up/down/up em banco vazio continuou passando na regressão financeira.
+
+O teste legado expôs uma limitação real do DDL inicialmente proposto: após UPDATE, eventos
+de constraint triggers diferidos impediam ALTER TABLE/CREATE INDEX subsequentes. A migration
+valida esses eventos com SET CONSTRAINTS ALL IMMEDIATE e restaura ALL DEFERRED antes do
+DDL seguinte. Não desativa triggers, não divide o commit e não muda o schema aprovado.
+As propostas originais foram preservadas; o ajuste de execução está explícito na migration.
+
+Runtime recebeu o grant restrito da coluna; UPDATE do ledger e CREATE de schema continuam
+negados. Alterar um deadline preenchido falhou no PostgreSQL com 23514. A transação terminal
+permanece imutável e excluída do claim. Writers antigos devem ser drenados antes do upgrade.
+
+### Testes reais novos
+
+| Cenário | Resultado |
+|---|---|
+| A — REFUND antes da BET | Inbox confirmou e SQS recebeu ACK enquanto PENDING_REFERENCE. Depois da BET, scheduler processou a mesma identidade; saldo 100.00 e três entradas no ledger. |
+| B — ROLLBACK antes da WIN | WIN elevou saldo e a pendência aplicou o débito inverso; saldo 100.00, três entradas e mesmo transactionId. |
+| C — referência incompatível | Player, wallet, moeda, round, valor e kind produziram rejeições específicas, sem ledger adicional. |
+| Namespace do provider | Mesmo externalId em outro provider não foi usado; referência correta continuou ausente até expiração, sem alias ou dupla compensação. |
+| D — referência REJECTED | Pendência rejeitada com REFERENCE_NOT_PROCESSED, saldo/ledger sem alteração adicional. |
+| Referência ainda pendente | Cadeia ROLLBACK → REFUND → BET reagendou sem repetir evento de pendência e depois resolveu; saldo 90.00 e quatro entradas. |
+| Referência tardia | BET após deadline não reviveu REFUND; REJECTED persistido e nenhum crédito indevido. |
+| E — TTL e orçamento | Deadline e três avaliações totais testados separadamente; REJECTED/REFERENCE_NOT_FOUND, snapshot, next_attempt_at nulo e nenhuma movimentação. Trocar TTL na configuração não alterou prazo persistido. |
+| F — três schedulers | Três processos/pools/backend PIDs independentes, barreira de início; uma resolução, um crédito de REFUND e processing_attempts=2. |
+| G — crash antes do commit | SIGKILL após escritas financeiras/outbox deixou rollback de saldo/ledger/status/contador/eventos. Outro processo retomou e aplicou uma vez. |
+| H — crash após commit | SIGKILL antes do ciclo operacional terminar; reinício não repetiu crédito, tentativa ou evento terminal. |
+| I — replay HTTP | Replay pendente não incrementou contador. Depois da resolução e outro crédito, replay retornou saldo histórico 100.00; saldo atual 150.00, quatro entradas. Payload divergente manteve 409. |
+| J — reinício de todas as instâncias | Três workers parados e três recriados localizaram seis pendências persistidas; referências posteriores resolveram sem replay de clientes. |
+| K — reversões concorrentes | REFUND e ROLLBACK pendentes da mesma BET: exatamente uma PROCESSED e outra REJECTED, saldo 100.00 e uma compensação. |
+| Crash após claim | SIGKILL liberou o claim sem consumir tentativa; outra instância concluiu. |
+| Sessão abandonada | Processo antigo permaneceu vivo; timeout idle real do PostgreSQL liberou a transação e permitiu recuperação por outro worker. |
+| Wallets independentes | Wallet A travada externamente foi pulada; B concluiu enquanto A continuava bloqueada. |
+| PostgreSQL indisponível para a tentativa | Lock exclusivo real na tabela causou timeout SQL e PERSISTENCE_UNAVAILABLE; nenhum orçamento consumido ou rejeição financeira; tentativa seguinte concluiu. |
+| SQS indisponível | Entrypoint compilado do scheduler iniciou com endpoint SQS inacessível e confirmou a resolução. Publisher falhou no endpoint real indisponível e depois publicou os três eventos duráveis da pendência no LocalStack. |
+
+Evidências do runner oficial final:
+
+```json
+{"scenario":"refund_before_bet","pendingAck":true,"result":"PROCESSED","balance":"100.00","ledger":3}
+{"scenario":"three_pending_workers","processes":[105,106,107],"backendPids":[147,145,146],"resolutions":1,"refundLedger":1}
+{"scenario":"pending_crash_after_commit","status":"PROCESSED","attempts":2,"refundLedger":1}
+{"scenario":"pending_http_historical_replay","terminalBalance":"100.00","currentBalance":"150.00","ledger":4}
+```
+
+### Resultado final da regressão
+
+```text
+bun run typecheck
+bun test test/unit
+bun run test:build
+bun run test:integration:docker
+docker compose config --quiet
+git diff --check
+```
+
+| Verificação | Resultado executado |
+|---|---|
+| Typecheck/build | Aprovados, no host e no build Linux Docker |
+| Smoke compilado | live=200; ready sem dependências=503; término por sinal exit 143 |
+| Unitários | 176 pass, zero falhas, 1.545 assertions |
+| Integração PostgreSQL/LocalStack | 91 pass, zero falhas, 1.214 assertions |
+| Composição | 7 fundação + 30 financeiros + 19 HTTP + 15 mensageria + 20 referências |
+| Total | 267 testes, zero falhas, 2.759 assertions |
+| Compose e whitespace | Configuração válida; diff sem erros |
+
+O runner oficial `jungle-financial-test-a94e0eaa` terminou com exit 0 e removeu os próprios
+containers/rede. PostgreSQL 17.11-alpine em tmpfs, LocalStack 4.12.0 e Bun 1.4.4, sem mocks
+financeiros substituindo banco/broker. Logs locais ignorados: .cache-stage6-final-build.log,
+.cache-stage6-final-unit.log e .cache-stage6-final-docker.log. Nenhum down -v foi usado.
+
+### Riscos, limites e Etapa 7
+
+- Desenvolvimento não foi migrado: .env, volume e dados financeiros existentes foram
+  preservados. Upgrade requer writers drenados e revisão de pendências legadas já vencidas.
+- Testes de concorrência/crash usam processos Bun independentes dentro do container de
+  testes, não três containers implantados. O Compose está configurado para escalar schedulers.
+- TTL/backoff usam relógio/jitter injetados nos testes; operação real pressupõe relógios UTC
+  sincronizados. Não há SLA, benchmark de carga ou exporter/agregação de métricas.
+- Indisponibilidade PostgreSQL foi um lock/timeout real; SQS foi endpoint TCP inacessível.
+  Não se desligou todo o PostgreSQL/LocalStack de desenvolvimento para simular indisponibilidade.
+- Ciclos de referências aguardam até limite/TTL; não há detecção de ciclos ou ordenação
+  topológica. Namespace de provider diferente não é pesquisado como referência alternativa.
+- Sem lease durável, não há contador exato de claims recuperados; recuperação de lock/estado
+  foi comprovada funcionalmente, sem inferir contagens que o banco não registra.
+- Execuções intermediárias tiveram uma comparação de enum tipada incorretamente, o caso de
+  triggers diferidos no DDL e uma fixture que tratava timestamp SQL bruto como Date. Foram
+  corrigidos antes do resultado final; as falhas não foram contadas como aprovação.
+- Nenhum novo motor, código de falha financeira, regra de reversão, frontend ou autenticação externa
+  foi acrescentado. Não houve commit/push ou avanço automático para a Etapa 7. O escopo da
+  próxima etapa deve ser definido pelo pedido específico; autenticação, observabilidade
+  agregada e carga continuam limitações documentadas, sem serem assumidas como seu escopo.
+
+## Etapa 7 — auditoria inicial, 29/10/2026
+
+Parecer **INCOMPLETO**. Regressão atual: typecheck/build/smoke aprovados; 176 testes
+unitários e 91 de integração passaram, zero falhas, 2.759 assertions. Projeto isolado
+`jungle-financial-test-155e0211` removido pelo runner, exit 0. Ambiente principal
+preservado: APIs antigas unhealthy, apenas migration inicial, sem filas ou workers.
+
+Relatório e limites em [docs/stage-7/AUDIT.md](docs/stage-7/AUDIT.md), rastreabilidade
+em [MATRIX.md](docs/stage-7/MATRIX.md), resultados individuais em
+[EVIDENCE.txt](docs/stage-7/EVIDENCE.txt) e plano pendente de aprovação em
+[PLAN.md](docs/stage-7/PLAN.md). Não houve implementação de runtime nesta auditoria.
+Ainda faltam carga/percentis, bateria completa de falhas e ambiente com três containers
+API mais workers; lacunas de métricas e readiness constam da matriz. Não se aprovou
+integralmente a Etapa 7 nem se iniciou a Etapa 8.
+
+## Etapa 7 — execução após autorização, 29/10/2026
+
+**APROVADO COM RESSALVAS no escopo local.** Este resultado sucede a auditoria inicial
+incompleta acima. Build/typecheck/smoke aprovados; 176 unitários + 101 integrações =
+277 testes PASS, zero FAIL, 2.849 assertions. Integração final no projeto descartável
+`jungle-financial-test-bdbbd37c`, exit 0. Novos testes incluem schema parcial, seis
+pontos de rollback, terminação real da conexão antes de commit, contadores pós-commit
+e protocolo FIFO com dedup, visibilidade, redelivery e long polling reais.
+
+O runner `jungle-distributed-test-146a4069` passou 11 cenários entre containers mais
+preparação de backlog, recuperação e carga (14 verificações). Três APIs, três
+consumers, dois publishers e três schedulers foram verificados saudáveis. Os 11
+containers sofreram SIGKILL/exit 137; após reinício recuperaram seis mensagens,
+seis pendências e 18 eventos, sem duplicação financeira. Carga de 118 operações:
+19 rejeições financeiras esperadas, zero erro operacional, 38 carteiras reconciliadas,
+171 eventos publicados e outbox final vazia. O comando standalone `bun run test:load`
+também passou, no projeto separado `jungle-distributed-test-1e158f6f`.
+
+Relatório: [RESULT.md](docs/stage-7/RESULT.md). Matriz: [MATRIX.md](docs/stage-7/MATRIX.md).
+Resultados individuais: [FINAL-TESTS.txt](docs/stage-7/FINAL-TESTS.txt). JSONs e hashes
+estão no mesmo diretório. Projetos de teste removidos sem down -v. Principal preservado,
+sem upgrade de schema ou workers. A falha inicial de binding ANY(?) no harness foi
+corrigida para IN (?) e reexecutada; não foi contada como aprovação. Limites de commit,
+métricas por processo, LocalStack e capacidade de produção estão explícitos no relatório.

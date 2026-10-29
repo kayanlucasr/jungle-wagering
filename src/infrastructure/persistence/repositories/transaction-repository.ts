@@ -6,6 +6,7 @@ import { TransactionRecord } from '../entities/financial-records';
 import { transactionFromRecord, transactionToRecord } from '../mappers/financial-mappers';
 import { FinancialError } from '../../../application/financial/errors';
 import { WagerTransactionKind as Kind } from '../../../domain/wagering/wager-transaction-kind';
+import type { ReferenceSchedule } from '../../../application/pending-reference/ports';
 
 export class PostgresTransactionRepository implements TransactionRepository {
   constructor(private readonly em: EntityManager) {}
@@ -46,16 +47,19 @@ export class PostgresTransactionRepository implements TransactionRepository {
   async insertOpening(tx: WagerTransaction): Promise<void> {
     await this.em.insert(TransactionRecord, transactionToRecord(tx));
   }
-  async save(tx: WagerTransaction, attemptedAt: Date): Promise<void> {
+  async save(tx: WagerTransaction, attemptedAt: Date, schedule?: ReferenceSchedule): Promise<void> {
     const row = transactionToRecord(tx);
     const changed = await this.em.execute<Array<{ id: string }>>(`update wagering.wager_transactions set
       status = ?, reference_transaction_id = ?, failure_code = ?, result_balance = ?, result_currency = ?,
       result_wallet_version = ?, result_schema_version = ?, terminal_result = ?::jsonb,
-      processing_attempts = processing_attempts + 1, last_attempt_at = ?, updated_at = ?, completed_at = ?
+      processing_attempts = processing_attempts + 1, last_attempt_at = ?, updated_at = ?, completed_at = ?,
+      next_attempt_at = ?, reference_deadline_at = coalesce(reference_deadline_at, ?)
       where id = ? returning id`, [row.status, row.referenceTransactionId, row.failureCode,
       row.resultBalance, row.resultCurrency, row.resultWalletVersion?.toString() ?? null,
       row.resultSchemaVersion, row.terminalResult === null ? null : JSON.stringify(row.terminalResult),
-      attemptedAt, row.completedAt ?? attemptedAt, row.completedAt, row.id]);
+      attemptedAt, row.completedAt ?? attemptedAt, row.completedAt,
+      tx.status === 'PENDING_REFERENCE' ? schedule?.nextAttemptAt ?? null : null,
+      schedule?.deadline ?? null, row.id]);
     if (changed.length !== 1) throw new FinancialError('PERSISTENCE_INTEGRITY');
   }
 }

@@ -41,6 +41,7 @@ export class TransactionRecord {
   processingAttempts!: number;
   nextAttemptAt!: Date | null;
   lastAttemptAt!: Date | null;
+  referenceDeadlineAt!: Date | null;
   createdAt!: Date;
   updatedAt!: Date;
   completedAt!: Date | null;
@@ -83,6 +84,7 @@ export const TransactionSchema = new EntitySchema<TransactionRecord>({ class: Tr
     resultWalletVersion: { ...version, nullable: true }, resultSchemaVersion: { type: 'integer', nullable: true },
     terminalResult: { type: 'json', columnType: 'jsonb', nullable: true }, processingAttempts: { type: 'integer' },
     nextAttemptAt: { ...timestamp, nullable: true }, lastAttemptAt: { ...timestamp, nullable: true },
+    referenceDeadlineAt: { ...timestamp, nullable: true },
     createdAt: timestamp, updatedAt: timestamp, completedAt: { ...timestamp, nullable: true },
   } });
 

@@ -18,7 +18,8 @@ export class WalletsController {
   @Post()
   async create(@Body() body: unknown, @Query() query: unknown, @Res({ passthrough: true }) res: Response) {
     noQuery(query);
-    const wallet = await this.commands.openWallet({ id: randomUUID(), ...createWalletDto(body) });
+    const wallet = await this.commands.openWallet({ id: randomUUID(), ...createWalletDto(body) },
+      { correlationId: String(res.getHeader('x-correlation-id')) });
     res.locals['financialTrace'] = { walletId: wallet.id };
     return walletResponse(wallet);
   }

@@ -23,7 +23,7 @@ export class AppModule {
         { provide: PostgresFinancialUnitOfWork, inject: [DatabaseService],
           useFactory: (database: DatabaseService) => new PostgresFinancialUnitOfWork(database.orm) },
         { provide: FinancialService, inject: [PostgresFinancialUnitOfWork],
-          useFactory: (unitOfWork: PostgresFinancialUnitOfWork) => new FinancialService(unitOfWork) },
+          useFactory: (unitOfWork: PostgresFinancialUnitOfWork) => new FinancialService(unitOfWork, config.pendingReference) },
         { provide: FinancialQueryService, inject: [PostgresFinancialUnitOfWork],
           useFactory: (unitOfWork: PostgresFinancialUnitOfWork) => new FinancialQueryService(unitOfWork) },
         { provide: HttpMetrics, useFactory: () => new HttpMetrics() },
