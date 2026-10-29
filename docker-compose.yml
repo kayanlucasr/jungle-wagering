@@ -1,0 +1,128 @@
+name: jungle-wagering
+
+x-app-environment: &app-environment
+  NODE_ENV: development
+  HOST: 0.0.0.0
+  PORT: "3000"
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: ${DB_NAME:-jungle_wagering}
+  DB_USER: ${RUNTIME_DB_USER:-wagering_app}
+  DB_PASSWORD: ${RUNTIME_DB_PASSWORD:-runtime_dev_only}
+  DB_POOL_MAX: ${DB_POOL_MAX:-10}
+  DEPENDENCY_TIMEOUT_MS: ${DEPENDENCY_TIMEOUT_MS:-2000}
+  AWS_REGION: ${AWS_REGION:-us-east-1}
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  SQS_ENDPOINT: http://localstack:4566
+  SQS_QUEUE_NAME: ${SQS_QUEUE_NAME:-wager-transactions.fifo}
+  SQS_DLQ_NAME: ${SQS_DLQ_NAME:-wager-transactions-dlq.fifo}
+  SQS_MAX_RECEIVE_COUNT: ${SQS_MAX_RECEIVE_COUNT:-5}
+  SQS_VISIBILITY_TIMEOUT_SECONDS: ${SQS_VISIBILITY_TIMEOUT_SECONDS:-30}
+
+x-application: &application
+  image: jungle-wagering:stage3
+  build:
+    context: .
+    target: runtime
+  environment: *app-environment
+
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-jungle_wagering}
+      POSTGRES_USER: ${ADMIN_DB_USER:-${DB_USER:-jungle}}
+      POSTGRES_PASSWORD: ${ADMIN_DB_PASSWORD:-${DB_PASSWORD:-jungle_dev_only}}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  localstack:
+    image: localstack/localstack:4.12.0
+    environment:
+      SERVICES: sqs
+      AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SQS_ENDPOINT_STRATEGY: dynamic
+    ports:
+      - "127.0.0.1:${LOCALSTACK_HOST_PORT:-4566}:4566"
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal sqs list-queues --region \"$$AWS_DEFAULT_REGION\" >/dev/null"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  queues:
+    <<: *application
+    command: ["bun", "dist/scripts/init-queues.js"]
+    depends_on:
+      localstack:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    restart: "no"
+
+  database-bootstrap:
+    <<: *application
+    command: ["bun", "dist/scripts/bootstrap-database.js"]
+    environment:
+      <<: *app-environment
+      ALLOW_DATABASE_BOOTSTRAP: "1"
+      ADMIN_DB_USER: ${ADMIN_DB_USER:-${DB_USER:-jungle}}
+      ADMIN_DB_PASSWORD: ${ADMIN_DB_PASSWORD:-${DB_PASSWORD:-jungle_dev_only}}
+      MIGRATION_DB_USER: ${MIGRATION_DB_USER:-wagering_migrator}
+      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD:-migration_dev_only}
+      RUNTIME_DB_USER: ${RUNTIME_DB_USER:-wagering_app}
+      RUNTIME_DB_PASSWORD: ${RUNTIME_DB_PASSWORD:-runtime_dev_only}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    restart: "no"
+
+  migrate:
+    <<: *application
+    command: ["bun", "dist/scripts/migrate.js", "up"]
+    environment:
+      <<: *app-environment
+      DB_USER: ${MIGRATION_DB_USER:-wagering_migrator}
+      DB_PASSWORD: ${MIGRATION_DB_PASSWORD:-migration_dev_only}
+      MIGRATION_DB_USER: ${MIGRATION_DB_USER:-wagering_migrator}
+      MIGRATION_DB_PASSWORD: ${MIGRATION_DB_PASSWORD:-migration_dev_only}
+    depends_on:
+      database-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      disable: true
+    restart: "no"
+
+  app:
+    <<: *application
+    ports:
+      - target: 3000
+        published: "${APP_HOST_PORT:-0}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      queues:
+        condition: service_completed_successfully
+    init: true
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

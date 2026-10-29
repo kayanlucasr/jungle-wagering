@@ -1,0 +1,48 @@
+{
+  "name": "jungle-wagering",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.4",
+  "engines": { "bun": "1.x" },
+  "scripts": {
+    "dev": "bun --watch src/main.ts",
+    "start": "bun src/main.ts",
+    "start:prod": "bun dist/src/main.js",
+    "build": "bun run typecheck && bun node_modules/typescript/bin/tsc -p tsconfig.build.json",
+    "typecheck": "bun node_modules/typescript/bin/tsc --noEmit",
+    "test": "bun test test/unit",
+    "test:integration": "bun test --timeout 30000 test/integration",
+    "test:integration:docker": "bun scripts/integration-docker.ts",
+    "test:build": "bun run build && bun scripts/smoke-build.ts",
+    "migration:up": "bun scripts/migrate.ts up",
+    "migration:down": "bun scripts/migrate.ts down",
+    "migration:status": "bun scripts/migrate.ts status",
+    "database:bootstrap": "bun scripts/bootstrap-database.ts",
+    "services:up": "docker compose up -d --wait postgres localstack",
+    "services:down": "docker compose down",
+    "services:status": "docker compose ps",
+    "stack:up": "docker compose up -d --build --wait",
+    "stack:scale": "docker compose up -d --build --wait --scale app=3",
+    "queues:init": "bun scripts/init-queues.ts",
+    "healthcheck": "bun scripts/healthcheck.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "3.1159.0",
+    "@mikro-orm/core": "6.6.17",
+    "@mikro-orm/migrations": "6.6.17",
+    "@mikro-orm/postgresql": "6.6.17",
+    "@nestjs/common": "11.2.8",
+    "@nestjs/core": "11.2.8",
+    "@nestjs/platform-express": "11.2.8",
+    "@smithy/node-http-handler": "4.13.0",
+    "decimal.js": "10.6.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.4",
+    "@types/express": "5.0.6",
+    "typescript": "5.9.3"
+  }
+}

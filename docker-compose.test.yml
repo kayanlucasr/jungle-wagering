@@ -1,0 +1,72 @@
+# Intentionally separate: no host ports, no named volumes, no existing database.
+x-test-environment: &test-environment
+  NODE_ENV: test
+  HOST: 0.0.0.0
+  PORT: "0"
+  LOG_LEVEL: error
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: jungle_wagering_test
+  DB_USER: jungle_test
+  DB_PASSWORD: isolated_test_only
+  DB_POOL_MAX: "4"
+  DEPENDENCY_TIMEOUT_MS: "1000"
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  SQS_ENDPOINT: http://localstack:4566
+  SQS_QUEUE_NAME: wager-transactions.fifo
+  SQS_DLQ_NAME: wager-transactions-dlq.fifo
+  SQS_MAX_RECEIVE_COUNT: "5"
+  SQS_VISIBILITY_TIMEOUT_SECONDS: "30"
+
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: jungle_wagering_test
+      POSTGRES_USER: jungle_test
+      POSTGRES_PASSWORD: isolated_test_only
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "jungle_test", "-d", "jungle_wagering_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  localstack:
+    image: localstack/localstack:4.12.0
+    environment:
+      SERVICES: sqs
+      SQS_ENDPOINT_STRATEGY: dynamic
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal sqs list-queues --region us-east-1 >/dev/null"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  queues:
+    build:
+      context: .
+      target: test
+    environment: *test-environment
+    command: ["bun", "scripts/init-queues.ts"]
+    depends_on:
+      localstack:
+        condition: service_healthy
+
+  tests:
+    build:
+      context: .
+      target: test
+    environment: *test-environment
+    command: ["bun", "run", "test:integration"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      queues:
+        condition: service_completed_successfully
