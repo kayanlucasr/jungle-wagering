@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Inject, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { NoopProviderIdentityGuard } from './noop-provider-identity.guard';
 import type { Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { FinancialService } from '../../application/financial/financial-service';
@@ -9,6 +10,7 @@ import { HttpMetrics } from './http-metrics';
 import { JsonLogger } from '../../infrastructure/observability/json-logger';
 
 @Controller('wallets')
+@UseGuards(NoopProviderIdentityGuard)
 export class WalletsController {
   constructor(@Inject(FinancialService) private readonly commands: FinancialService,
     @Inject(FinancialQueryService) private readonly queries: FinancialQueryService,

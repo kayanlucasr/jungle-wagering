@@ -126,7 +126,16 @@ describe('Stage 5 distributed messaging on PostgreSQL and LocalStack FIFO', () =
     })();
     const replica: Replica = { child, notices, output, stderr: new Response(child.stderr).text(), ready: { event: 'pending' }, stopped: false };
     replicas.push(replica);
-    replica.ready = await until(async () => notices.find((notice) => notice.event === 'ready' || notice.event === 'worker_started'));
+    replica.ready = await until(async () => {
+      const ready = notices.find((notice) => notice.event === 'ready' || notice.event === 'worker_started');
+      if (ready) return ready;
+      if (child.exitCode !== null) {
+        await output;
+        // This harness only runs against synthetic credentials in a disposable DB.
+        throw new Error(`WorkerStartupFailed:${await replica.stderr}`);
+      }
+      return undefined;
+    });
     return replica;
   }
   async function stop(replica: Replica): Promise<void> {

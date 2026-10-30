@@ -10,6 +10,7 @@ import { WalletsController } from './interfaces/http/wallets.controller';
 import { TransactionsController } from './interfaces/http/transactions.controller';
 import { HttpMetrics } from './interfaces/http/http-metrics';
 import { JsonLogger } from './infrastructure/observability/json-logger';
+import { NoopProviderIdentityGuard } from './interfaces/http/noop-provider-identity.guard';
 
 @Module({})
 export class AppModule {
@@ -18,6 +19,7 @@ export class AppModule {
       module: AppModule,
       controllers: [HealthController, WalletsController, TransactionsController],
       providers: [
+        NoopProviderIdentityGuard,
         { provide: APP_CONFIG, useValue: config },
         { provide: DatabaseService, useFactory: () => DatabaseService.create(config) },
         { provide: PostgresFinancialUnitOfWork, inject: [DatabaseService],

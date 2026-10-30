@@ -1,0 +1,12 @@
+Instalacao limpa atual em imagem Docker: docker build --no-cache --target test -t jungle-stage8-clean:test .
+Somente dependencias do projeto dentro da imagem; nenhuma ferramenta/dependencia instalada no host.
+
+#8 [dependencies 4/4] RUN bun install --frozen-lockfile
+#8 0.217 bun install v1.4.4 (38afee6c8)
+#8 1.556 234 packages installed [1340.00ms]
+#13 [build 5/5] RUN bun run build
+#13 0.212 $ bun run typecheck && bun node_modules/typescript/bin/tsc -p tsconfig.build.json
+#13 0.217 $ bun node_modules/typescript/bin/tsc --noEmit
+#14 naming to docker.io/library/jungle-stage8-clean:test done
+#14 unpacking to docker.io/library/jungle-stage8-clean:test
+#14 unpacking to docker.io/library/jungle-stage8-clean:test 7.3s done

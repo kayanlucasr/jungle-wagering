@@ -1,0 +1,116 @@
+{
+  "project": "jungle-delivery-test-b51fbbe7",
+  "image": "jungle-stage8-delivery:b51fbbe7",
+  "startedAt": "2026-10-29T22:11:21.4747210Z",
+  "source": "docker-compose.yml + isolated ports/volume/database/image override",
+  "health": [
+    {
+      "live": 200,
+      "ready": 200,
+      "uid": 1000
+    },
+    {
+      "live": 200,
+      "ready": 200,
+      "uid": 1000
+    },
+    {
+      "live": 200,
+      "ready": 200,
+      "uid": 1000
+    }
+  ],
+  "instances": [
+    {
+      "service": "app",
+      "id": "a867007cb2f3",
+      "state": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "app",
+      "id": "2d1a7e0b19ca",
+      "state": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "app",
+      "id": "75712026fdd7",
+      "state": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "consumer",
+      "id": "11a0acaee99b",
+      "state": "running",
+      "health": ""
+    },
+    {
+      "service": "consumer",
+      "id": "0212293ea2b3",
+      "state": "running",
+      "health": ""
+    },
+    {
+      "service": "consumer",
+      "id": "d22cfe07b5f2",
+      "state": "running",
+      "health": ""
+    },
+    {
+      "service": "localstack",
+      "id": "dafffe5d8f43",
+      "state": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "pending-reference",
+      "id": "743c7520bd1a",
+      "state": "running",
+      "health": ""
+    },
+    {
+      "service": "pending-reference",
+      "id": "6662aa98b409",
+      "state": "running",
+      "health": ""
+    },
+    {
+      "service": "pending-reference",
+      "id": "2125de49a55f",
+      "state": "running",
+      "health": ""
+    },
+    {
+      "service": "postgres",
+      "id": "d33bd39fb19e",
+      "state": "running",
+      "health": "healthy"
+    },
+    {
+      "service": "publisher",
+      "id": "b010516dca6f",
+      "state": "running",
+      "health": ""
+    },
+    {
+      "service": "publisher",
+      "id": "eb6c6c6db096",
+      "state": "running",
+      "health": ""
+    }
+  ],
+  "financial": {
+    "opening": 201,
+    "statuses": [
+      200,
+      422
+    ],
+    "balance": "20.00",
+    "consistent": true,
+    "ledgerEntries": 2
+  },
+  "status": "PASS",
+  "cleanup": "PASS",
+  "finishedAt": "2026-10-29T22:11:48.2099971Z"
+}

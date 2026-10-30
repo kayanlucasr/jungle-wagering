@@ -1,5 +1,16 @@
 import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+import { isAbsolute, join, relative, resolve } from 'node:path';
+
+// Keep historical evidence when a later audit reruns the same validation.
+const evidenceFlag = process.argv.indexOf('--evidence-dir');
+const requestedDirectory = evidenceFlag < 0 ? 'docs/stage-7' : process.argv[evidenceFlag + 1];
+if (!requestedDirectory || requestedDirectory.startsWith('--')) throw new Error('EvidenceDirectoryRequired');
+const evidenceDirectory = resolve(requestedDirectory);
+const relativeDirectory = relative(process.cwd(), evidenceDirectory);
+if (!relativeDirectory || relativeDirectory === '..' || relativeDirectory.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)
+  || isAbsolute(relativeDirectory)) throw new Error('EvidenceDirectoryMustBeInsideWorkspace');
 
 const project = `jungle-distributed-test-${crypto.randomUUID().slice(0, 8)}`;
 const base = ['compose', '-p', project, '-f', 'docker-compose.distributed-test.yml'];
@@ -46,6 +57,24 @@ try {
     .sort((a, b) => a.Service.localeCompare(b.Service)).map((r) => spawnSync('docker', ['inspect', '--format', '{{.Config.Hostname}}', r.ID], { encoding: 'utf8' }).stdout.trim()).join(',');
   if (!loadOnly) {
     phase('test/distributed/scenarios.ts', [], instanceIds());
+    // Metrics are volatile and emitted every 10s. Observe the conflict counter
+    // before SIGKILL resets it; a fast financial suite can finish within that interval.
+    const metricDeadline = Date.now() + 25000;
+    let observedConflict = false;
+    while (Date.now() < metricDeadline) {
+      const apiLogs = run(['logs', '--no-color', 'app1', 'app2', 'app3'], true);
+      const metrics = apiLogs.split('\n').flatMap((line) => {
+        const start = line.indexOf('{'); if (start < 0) return [];
+        try { return [JSON.parse(line.slice(start)) as { event: string; metrics?: Record<string, number> }]; }
+        catch { return []; }
+      });
+      if (metrics.some((r) => r.event === 'financial_metrics' && (r.metrics?.['idempotencyConflicts'] ?? 0) > 0)) {
+        observedConflict = true; break;
+      }
+      await Bun.sleep(1000);
+    }
+    assert.ok(observedConflict, 'ConflictMetricsNotObservedBeforeCrash');
+    evidence['preCrashConflictMetricObserved'] = true;
     // Abruptly kill every application/worker process; never stop the database/broker.
     run(['kill', '-s', 'SIGKILL', ...roles]);
     const killed = run(['ps', '--all', '--format', 'json'], true).trim().split('\n').filter(Boolean)
@@ -64,7 +93,9 @@ try {
   phase('test/distributed/load.ts', [], instanceIds());
   await Bun.sleep(11000); // Receive a fresh metrics heartbeat after the workload.
   const logs = run(['logs', '--no-color', ...roles], true);
-  await Bun.write('.cache-stage7-distributed-runtime.log', logs);
+  if (evidenceFlag >= 0) await mkdir(evidenceDirectory, { recursive: true });
+  await Bun.write(evidenceFlag < 0 ? '.cache-stage7-distributed-runtime.log'
+    : join(evidenceDirectory, `${loadOnly ? 'load' : 'distributed'}-runtime.log`), logs);
   const records = logs.split('\n').flatMap((line) => {
     const start = line.indexOf('{'); if (start < 0) return [];
     try { return [JSON.parse(line.slice(start)) as { event: string; instanceId: string; metrics?: Record<string, number>;
@@ -100,7 +131,8 @@ try {
   evidence['finishedAt'] = new Date().toISOString();
   try { run(['down', '--remove-orphans']); evidence['cleanup'] = 'PASS'; }
   catch { evidence['cleanup'] = 'FAIL'; process.exitCode = 1; }
-  const path = `docs/stage-7/${loadOnly ? 'load' : 'distributed'}-evidence.json`;
+  await mkdir(evidenceDirectory, { recursive: true });
+  const path = join(evidenceDirectory, `${loadOnly ? 'load' : 'distributed'}-evidence.json`);
   await Bun.write(path, JSON.stringify(evidence, null, 2) + '\n');
   console.log(JSON.stringify({ evidence: path, project, status: evidence['status'], cleanup: evidence['cleanup'] }));
 }

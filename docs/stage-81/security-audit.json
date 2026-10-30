@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-29",
+  "command": "bun audit --json",
+  "exitCode": 0,
+  "advisories": {},
+  "overrides": {
+    "ajv": "8.18.0",
+    "multer": "2.5.0"
+  },
+  "frameworksUnchanged": {
+    "nestjs": "11.2.8",
+    "mikroOrm": "6.6.17"
+  },
+  "limitations": "Overrides exceed parent ranges; audited at execution time, not a permanent security guarantee"
+}

@@ -1,0 +1,40 @@
+Auditoria Git final - 29/10/2026
+Base:
+ba6c99791773f4349b2cd6c71247e10a0b6abc5c
+Estado inicial: working tree limpo; zero arquivos nao rastreados fora das exclusoes.
+Revisoes alcancaveis inspecionadas: 3.
+Source/financeiro, testes, migrations, package.json, bun.lock, .gitignore, Composes existentes e docs/stage-7: intactos.
+git diff --check: PASS (avisos locais de normalizacao LF/CRLF, sem erros).
+Busca por formatos comuns de segredos: zero candidatos no estado atual e revisoes alcancaveis.
+Nenhuma exclusao, reset, clean, commit, push ou reescrita de historico.
+
+=== Estado final de arquivos para revisao ===
+ M ARCHITECTURE.md
+ M README.md
+ M VALIDATION.md
+ M docs/DOMAIN.md
+ M docs/HTTP_API.md
+ M scripts/distributed-test-docker.ts
+ M scripts/load-test.ts
+?? FINAL_REVIEW.md
+?? docs/stage-8/AUDIT.md
+?? docs/stage-8/CLEANUP.md
+?? docs/stage-8/CONFORMANCE.md
+?? docs/stage-8/REMEDIATION.md
+?? docs/stage-8/TESTS.txt
+?? docs/stage-8/clean-install.txt
+?? docs/stage-8/cleanup-inventory.csv
+?? docs/stage-8/compose-delivery.override.yml
+?? docs/stage-8/delivery-smoke.json
+?? docs/stage-8/distributed-evidence.json
+?? docs/stage-8/load-evidence.json
+?? docs/stage-8/security-audit.json
+?? docs/stage-8/source-hashes.json
+
+=== Regras de exclusao verificadas ===
+.gitignore:4:.env	.env
+.gitignore:9:*.log	.cache-stage8-final-build.log
+.gitignore:9:*.log	docs/stage-8/distributed-runtime.log
+.gitignore:2:dist/	dist/src/main.js
+.gitignore:1:node_modules/	node_modules/typescript/package.json
+.gitignore:7:.tools/	.tools/package/bin/bun.exe

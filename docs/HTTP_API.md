@@ -20,6 +20,9 @@ Identificadores externos continuam strings do domínio, sem obrigação de serem
 - Endpoints de leitura não retornam entidades ORM, payloadHash ou idempotencyKey.
 - Autenticação externa está fora desta etapa; não há isolamento autorizado por provider
   implementado. Os testes usam somente ambiente local/descartável.
+- A Etapa 8.1 conecta NoopProviderIdentityGuard aos dois controllers financeiros.
+  É uma extensão explícita sem autenticação: permite acesso e não altera providerId,
+  body ou contexto financeiro. Health permanece sem guard; SQS não passa por ele.
 
 ## Rotas e status
 
@@ -33,7 +36,7 @@ Identificadores externos continuam strings do domínio, sem obrigação de serem
 | POST /wagering/transactions | 200 PROCESSED, 202 PENDING/PENDING_REFERENCE, 422 REJECTED, 500 FAILED persistido. |
 | POST /wallets/:walletId/reconciliation | 200 com diagnóstico, inclusive quando consistent=false; não corrige dados. |
 | GET /health/live | Contrato da fundação: processo vivo, 200. |
-| GET /health/ready | Contrato da fundação: PostgreSQL/namespace e filas prontos, 200; indisponibilidade, 503. |
+| GET /health/ready | PostgreSQL, tabelas/colunas operacionais e filas prontos, 200; indisponibilidade/schema parcial, 503. |
 
 As consultas financeiras recusam query params desconhecidos. Ledger aceita somente
 `limit` e `cursor`; reconciliação não recebe payload ou aceita apenas `{}`.
@@ -270,7 +273,8 @@ Nest reais usando `dist/`, cada um com pool e conexão PostgreSQL próprios e lo
 Ao executar integração fora do Docker, configurar o ambiente administrativo de testes e
 executar `bun run build` antes de `bun run test:integration` para atualizar `dist/`.
 
-O teste de pendência concluída usa exclusivamente um harness interno de teste com o
-domínio, lock e UoW existentes. Não foi criado endpoint de retomada ou worker operacional.
-Consumer, publisher, retries/DLQ de mensagens, autenticação externa e frontend permanecem
-fora da Etapa 4. Resultados reais e preparação da Etapa 5 estão em [VALIDATION.md](../VALIDATION.md).
+O teste histórico da Etapa 4 usa harness interno para conclusão. As Etapas 5–7
+implementaram consumer, publisher, retries/DLQ e scheduler operacional, sem endpoint
+de retomada. Autenticação externa e frontend continuam ausentes. Readiness e métricas
+foram ampliados na Etapa 7. Estado atual e pendências de conformidade estão em
+[FINAL_REVIEW.md](../FINAL_REVIEW.md); este documento preserva o contrato HTTP.

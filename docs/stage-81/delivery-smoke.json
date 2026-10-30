@@ -1,0 +1,33 @@
+{
+  "project": "jungle-stage81-delivery-919a3ecc",
+  "image": "jungle-stage81-clean:runtime",
+  "health": [
+    {
+      "live": 200,
+      "ready": 200,
+      "uid": 1000
+    },
+    {
+      "live": 200,
+      "ready": 200,
+      "uid": 1000
+    },
+    {
+      "live": 200,
+      "ready": 200,
+      "uid": 1000
+    }
+  ],
+  "status": "PASS",
+  "financial": {
+    "opening": 201,
+    "statuses": [
+      200,
+      422
+    ],
+    "balance": "20.00",
+    "consistent": true,
+    "ledgerEntries": 2
+  },
+  "cleanup": "PASS"
+}

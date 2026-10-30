@@ -1,0 +1,46 @@
+services:
+  postgres:
+    ports: !reset []
+    volumes: !reset []
+    tmpfs:
+      - /var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: jungle_wagering_test_delivery
+  localstack:
+    ports: !reset []
+  app:
+    image: jungle-stage8-delivery:review
+    ports: !reset []
+    environment:
+      NODE_ENV: test
+      DB_NAME: jungle_wagering_test_delivery
+  database-bootstrap:
+    image: jungle-stage8-delivery:review
+    environment:
+      NODE_ENV: test
+      DB_NAME: jungle_wagering_test_delivery
+  migrate:
+    image: jungle-stage8-delivery:review
+    environment:
+      NODE_ENV: test
+      DB_NAME: jungle_wagering_test_delivery
+  queues:
+    image: jungle-stage8-delivery:review
+    environment:
+      NODE_ENV: test
+      DB_NAME: jungle_wagering_test_delivery
+  consumer:
+    image: jungle-stage8-delivery:review
+    environment:
+      NODE_ENV: test
+      DB_NAME: jungle_wagering_test_delivery
+  publisher:
+    image: jungle-stage8-delivery:review
+    environment:
+      NODE_ENV: test
+      DB_NAME: jungle_wagering_test_delivery
+  pending-reference:
+    image: jungle-stage8-delivery:review
+    environment:
+      NODE_ENV: test
+      DB_NAME: jungle_wagering_test_delivery

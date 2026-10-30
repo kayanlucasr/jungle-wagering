@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-29",
+  "distributed": {
+    "project": "jungle-distributed-test-a7fe5bd3",
+    "status": "FAIL",
+    "error": "false == true",
+    "financialScenarios": "PASS; final periodic metric assertion failed before fix",
+    "cleanup": "PASS"
+  },
+  "integration": {
+    "project": "jungle-financial-test-2b8befd4",
+    "pass": 100,
+    "fail": 1,
+    "scenario": "F: three consumer processes",
+    "observation": "One child exited 1 before ready; original harness did not surface stderr",
+    "cause": "Not established; rerun with startup diagnostics",
+    "cleanup": "PASS"
+  }
+}

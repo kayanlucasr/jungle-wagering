@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-29",
+  "gitHead": "ba6c99791773f4349b2cd6c71247e10a0b6abc5c",
+  "historyRevisionsChecked": [
+    "ba6c99791773f4349b2cd6c71247e10a0b6abc5c",
+    "18644e7300c0727ed9ac6443b3ed85989aceaf43",
+    "2d0e420a22ed58b90ab06b171e9d124a3aeae7c0"
+  ],
+  "secretPatternCandidates": [],
+  "secretScanLimit": "Busca por formatos comuns e revisão de configurações; não prova ausência universal de segredos.",
+  "envTracked": false,
+  "dependencyAuditExitCode": 1,
+  "advisories": {
+    "ajv": [
+      {
+        "id": 1113715,
+        "url": "https://github.com/advisories/GHSA-2g4f-4pwh-qvx6",
+        "title": "ajv has ReDoS when using `$data` option",
+        "severity": "moderate",
+        "vulnerable_versions": ">=7.0.0-alpha.0 <8.18.0",
+        "cwe": [
+          "CWE-400",
+          "CWE-1333"
+        ],
+        "cvss": {
+          "score": 0,
+          "vectorString": null
+        }
+      }
+    ],
+    "multer": [
+      {
+        "id": 1243083,
+        "url": "https://github.com/advisories/GHSA-q7qp-rjg7-q26m",
+        "title": "multer vulnerable to Denial of Service via a pending asynchronous fileFilter after request teardown",
+        "severity": "high",
+        "vulnerable_versions": ">=2.0.0 <2.5.0",
+        "cwe": [
+          "CWE-248",
+          "CWE-404"
+        ],
+        "cvss": {
+          "score": 7.5,
+          "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        }
+      }
+    ]
+  },
+  "packages": [
+    {
+      "name": "ajv",
+      "version": "8.13.0",
+      "chain": "@mikro-orm/migrations -> umzug -> @rushstack/* -> ajv",
+      "requiredConfiguration": "$data: true",
+      "configurationFoundInApplication": false
+    },
+    {
+      "name": "multer",
+      "version": "2.4.0",
+      "chain": "@nestjs/platform-express -> multer",
+      "requiredConfiguration": "Upload route with asynchronous fileFilter",
+      "configurationFoundInApplication": false
+    }
+  ],
+  "toolsOrDependenciesUpdated": false,
+  "currentTreeSecretPatternCandidates": [],
+  "directDependencyVersionsMatch": true,
+  "directDependencies": 11,
+  "devDependencies": 3
+}

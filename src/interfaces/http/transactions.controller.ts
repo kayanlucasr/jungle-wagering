@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Inject, Param, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { NoopProviderIdentityGuard } from './noop-provider-identity.guard';
 import type { Request, Response } from 'express';
 import { FinancialService } from '../../application/financial/financial-service';
 import { FinancialQueryService } from '../../application/financial/financial-query-service';
@@ -6,6 +7,7 @@ import { idempotencyKey, identifier, noQuery, submitTransactionDto } from './fin
 import { submissionResponse, submissionStatus, transactionResponse } from './financial-responses';
 
 @Controller()
+@UseGuards(NoopProviderIdentityGuard)
 export class TransactionsController {
   constructor(@Inject(FinancialService) private readonly commands: FinancialService,
     @Inject(FinancialQueryService) private readonly queries: FinancialQueryService) {}

@@ -1,0 +1,241 @@
+# Revisão final de entrega — Jungle Wagering
+
+Data: **29/10/2026**, America/Sao_Paulo. Fonte original:
+[docs/CHALLENGE.md](docs/CHALLENGE.md). Base Git auditada: `ba6c997`.
+
+## A. Resumo executivo
+
+**Parecer: NÃO PRONTO para declarar conformidade final com o desafio.** O processador
+funciona nos cenários financeiros/distribuídos executados: 277 testes passaram, a
+validação com três APIs/11 papéis passou, e uma instalação nova da imagem final
+também passou. Isso não sana automaticamente requisitos de conformidade ausentes.
+
+Permanecem: **P1-02**, ponto de extensão em código exigido pela opção sem IdP; e
+**P1-01**, decisão/aceite da política adicional que exclui REFUND e ROLLBACK diretos
+entre si. Há ainda diferença de modelagem Inbox/Outbox e dois advisories transitivos.
+Nenhum defeito P0 financeiro foi reproduzido; não houve alteração automática de
+política, constraint, privilégio, dependência ou implantação principal.
+
+A auditoria/documentação foi entregue com as pendências explícitas. O critério de
+aceite de não haver P0/P1 pendente para declarar o projeto pronto **não está atendido**.
+
+## B. Stack validada
+
+| Tecnologia | Versão observada |
+|---|---|
+| Bun | 1.4.4, host e imagem Docker |
+| TypeScript | 5.9.3, strict |
+| NestJS | 11.2.8 |
+| MikroORM core/postgresql/migrations | 6.6.17 |
+| PostgreSQL | 17.11-alpine |
+| LocalStack | 4.12.0 |
+| AWS SDK SQS / Smithy NodeHttpHandler | 3.1159.0 / 4.13.0 |
+| decimal.js | 10.6.0 |
+| Docker client/server / Compose | 29.9.2 / v5.6.1 |
+
+As 11 dependências diretas instaladas coincidiram com package.json. A imagem limpa
+executou `bun install --frozen-lockfile`, instalou **234 pacotes** e compilou com
+typecheck, sem utilizar node_modules do host. A imagem final de runtime também foi
+construída/iniciada; três APIs rodaram como UID 1000. Nenhuma ferramenta/dependência
+foi instalada ou atualizada no host. Evidência: [clean-install.txt](docs/stage-8/clean-install.txt)
+e [delivery-smoke.json](docs/stage-8/delivery-smoke.json).
+
+## C. Requisitos atendidos e desvios
+
+A matriz completa de 48 verificações, vinculada exclusivamente ao enunciado original,
+está em [CONFORMANCE.md](docs/stage-8/CONFORMANCE.md): **46 PASS e 2 FAIL de inspeção**.
+Não há cenário funcional obrigatório BLOCKED/NOT_TESTED nesta rodada. Os dois FAIL
+não representam testes Bun falhando: são C16 (forma das classes Inbox/Outbox ausente)
+e C45 (extensão de identidade em código ausente). C22 comprova unicidade por tipo,
+mas registra a restrição adicional como risco P1 de aceitação.
+
+Os requisitos financeiros/infraestrutura/endpoints, atomicidade, idempotência,
+concorrência, SQS, recuperação e observabilidade têm implementação e execução real.
+A aceitação literal das diferenças de modelagem e reversão não foi inventada.
+
+| Prioridade | Achado | Estado |
+|---|---|---|
+| P0 | Saldo incorreto, duplicação, ledger inconsistente ou corrida financeira crítica | Nenhum reproduzido |
+| P1-01 | Exclusão conjunta de reversões é mais restrita que a leitura por referência/tipo | Decisão/aceite externo pendente; política preservada |
+| P1-02 | Desenho sem IdP não tem ponto de extensão ligado ao código | Ausência confirmada; proposta aguarda aprovação |
+| P2-01 | Ajv 8.13.0 moderado e Multer 2.4.0 alto no audit | Sem caminho vulnerável configurado identificado; atualização pendente |
+| P2-02 | Inbox/Outbox não possuem as classes/factories do esqueleto | Garantias SQL comprovadas, diferença de forma registrada |
+| P2 corrigido | Documentos misturavam comportamento implementado com planejamento antigo | README/arquitetura/HTTP/domínio sincronizados |
+| P2 corrigido | Reexecutar o runner substituía sempre a evidência da etapa 7 | --evidence-dir adicionado, exercitado em distribuído e carga |
+
+Causa, impacto, arquivos, alternativas e riscos em
+[REMEDIATION.md](docs/stage-8/REMEDIATION.md). A opção de reversão por tipo precisa
+considerar que BET -10, REFUND +10 e ROLLBACK direto da BET +10 terminariam em 110.00
+partindo de 100.00. Essa mudança econômica não é aplicada silenciosamente para
+"fazer o teste passar". ROLLBACK de REFUND já é permitido e testado.
+
+## D. Testes executados nesta auditoria
+
+Estes números são de **novas execuções da Etapa 8**, não cópia da Etapa 7.
+Resultados individuais: [TESTS.txt](docs/stage-8/TESTS.txt).
+
+| Execução final | Resultado |
+|---|---|
+| Build/typecheck/smoke compilado | PASS; live=200, ready sem dependências=503, saída por sinal 143 |
+| Unitários Bun | 176 PASS, 0 FAIL, 1.545 assertions |
+| Integrações PostgreSQL/LocalStack | 101 PASS, 0 FAIL, 1.304 assertions, 69,02 s |
+| Composição da integração | 8 fundação + 38 financeiros + 19 HTTP + 16 mensageria + 20 pendências |
+| Total Bun | **277 PASS, 0 FAIL, 2.849 assertions** |
+| Runner distribuído | 11 cenários + preparação de backlog + recuperação + carga: 14 verificações PASS |
+| Carga standalone | Repetição independente PASS, não somada como teste distinto |
+| Instalação limpa sem cache | Frozen lockfile e build PASS em imagem nova |
+| Compose principal em ambiente descartável | Três APIs live/ready=200, UID não root, cenário 100/80/80 consistente |
+| bun audit --json | **FAIL de segurança de dependências**, exit 1, dois advisories; não é falha de teste financeiro |
+
+Projetos desta rodada: integração `jungle-financial-test-ea0bef3d`, distribuído
+`jungle-distributed-test-3a1c3dc2`, carga `jungle-distributed-test-b8a726b2`, imagem
+final/Compose `jungle-delivery-test-b51fbbe7`. Todos encerraram seus containers/redes;
+nenhum `down -v` foi usado. Uma rodada inicial anterior ao ajuste do runner também
+passou, mas não foi somada novamente ao total final.
+
+Não foram executados testes de AWS real, failover, restore, perda física de disco,
+IdP ou exploração dos advisories. Não são usados como evidência PASS. O programa
+de testes obrigatórios existente cobre as invariantes financeiras críticas; não
+foi necessário acrescentar teste duplicado de baixo valor nesta etapa documental.
+
+## E. Correção financeira
+
+As suítes atuais comprovam dinheiro exato/imutável e escala/moeda inválidas recusadas;
+saldo não negativo por domínio/schema; unicidade de wallet/identidades; versões;
+OPENING interno, abertura positiva atômica e zero sem ledger; LOSS/rejeições sem
+movimento; terminais/snapshots/ledger imutáveis; referências válidas e inválidas;
+ROLLBACK de WIN/REFUND sujeito a saldo; reconciliação e diagnóstico de fixtures.
+
+Seis pontos de falha SQL conferiram rollback de transação, inbox, wallet, ledger e
+outbox; retry aplicou uma vez. Outra conexão foi terminada antes de COMMIT e a
+identidade foi consultada em conexão nova antes de repetir. Resposta perdida depois
+de commit real é testada separadamente por confirmação de inbox. Não se tratou uma
+exceção como prova de rollback, nem se simulou partição física no exato COMMIT.
+
+Nenhum trigger foi desativado em banco existente. Nenhum dado financeiro principal
+foi alterado. Testes da política interna não são apresentados como aceite externo
+da interpretação de reversões ainda pendente.
+
+## F. Concorrência e carga
+
+No projeto distribuído atual, as APIs `4c3eb193e338`, `8e08bfde0c7e` e `6044c692721b`
+tiveram backend PIDs PostgreSQL **108, 107 e 109**, respectivamente. São containers,
+processos e conexões independentes; IDs/timestamps e demais workers estão em
+[distributed-evidence.json](docs/stage-8/distributed-evidence.json).
+
+- A: duas BET 80.00 sobre 100.00 → uma PROCESSED, outra REJECTED, saldo 20.00,
+  um débito e reconciliação consistente.
+- B: 50 HTTP idênticos entre APIs → uma identidade, um débito, uma resposta original
+  e 49 replays coerentes; saldo 90.00.
+- C: wallet B confirmou enquanto lock SQL real ainda retinha A.
+- D: REFUND/ROLLBACK concorrentes → uma compensação pela política atual, outra rejeitada.
+- E: reversão sem saldo → REVERSAL_INSUFFICIENT_FUNDS, sem saldo negativo/ledger extra.
+- Replay preservou saldo histórico após movimento posterior, resolução e reinício.
+
+Carga pequena reproduzível: 94 HTTP + 24 envios SQS, 57 transações externas distintas,
+75 respostas HTTP 200 (incluindo replays), 19 rejeições esperadas e **zero erro
+operacional**. As 38 carteiras reconciliaram; 171 eventos publicados; outbox final zero.
+Na execução distribuída: 44,74 operações de transporte/s; HTTP p50/p95/p99 de
+553,52/696,33/771,81 ms. A repetição standalone observou 48,84 operações/s e
+667,91/856,19/876,70 ms. Os demais percentis/lag estão nos JSONs.
+
+São observações locais sem meta arbitrária, warmup ou afirmação de capacidade de
+produção. Percentis são nearest rank; throughput conta transporte, não efeitos
+financeiros distintos. Criação das wallets e reconciliação final ficam fora da janela.
+
+## G. Mensageria, recuperação e observabilidade
+
+FIFO real confirmou grupo/dedup, long polling, visibilidade e redelivery. Inbox
+persistente evitou duplicação; ACK ocorreu depois do commit. Dois publishers usaram
+claims/leases/fencing. SIGKILL após envio preservou eventId; subscriber de projeção
+deduplicou persistentemente eventos cujo transporte contornou dedup do SQS.
+
+Consumer foi morto após commit antes do ACK; scheduler foi morto durante claim e
+antes/depois do commit. O restart conjunto encerrou **11 containers com código 137**;
+seis mensagens, seis referências pendentes e 18 eventos outbox foram preparados
+durante a parada, e 12 operações foram retomadas sem dupla movimentação. As carteiras
+reconciliaram e os snapshots históricos permaneceram corretos. SIGTERM foi testado
+separadamente como drenagem; não foi chamado de crash.
+
+Logs atuais: 848 registros JSON validados, 83 entregas confirmadas e 289 publicações
+observadas no experimento completo. Snapshots de métricas cobrem status, duplicatas,
+retries, locks, DLQ, outbox lag/depth, pendências e duração. São observações por
+processo/voláteis; não substituem o ledger nem agregação persistente. Publisher
+separa eventId de messageId. Nenhum exporter/serviço extra foi instalado.
+
+## H. Documentação, limpeza e Git
+
+Criados: este relatório e docs/stage-8 com matriz, auditoria, propostas, inventário,
+override de reprodução, resultados selecionados, JSONs e hashes de fonte. Atualizados:
+README.md, ARCHITECTURE.md, VALIDATION.md, docs/DOMAIN.md e docs/HTTP_API.md.
+Os dois runners foram ajustados somente para destino de evidências/repasse da opção.
+src/, testes financeiros, migrations, grants, package.json, bun.lock e os três Composes
+existentes não mudaram. Evidências rastreadas da etapa 7 foram preservadas.
+
+[CLEANUP.md](docs/stage-8/CLEANUP.md) classifica KEEP/IGNORE/REMOVE; o CSV individualiza
+os logs. Nenhum arquivo foi excluído. O .gitignore já ignora logs/.cache/dist/
+node_modules/.tools/.env e preserva .env.example; não precisou de alteração. SQLs de
+review, migrations, fixtures e documentação não são tratados como lixo.
+
+Inspeção de três revisões Git e configuração não encontrou segredo real conhecido.
+.env não está versionado; defaults locais/fixtures são sintéticos. A busca por formatos
+comuns não é uma certificação universal. `bun audit` registrou os dois avisos em
+[security-audit.json](docs/stage-8/security-audit.json). Nenhum histórico foi reescrito.
+
+## I. Limitações e preparação do envio
+
+Além dos achados prioritários, a instalação principal continua antiga: três APIs
+stage1 unhealthy, somente a migration inicial, filas/workers ausentes. Foi preservada;
+o checkout e os ambientes descartáveis são as evidências de reprodução. Não se deve
+demonstrar essa instalação antiga como a versão final.
+
+Sem IdP real, double-entry, frontend, exporter agregado, SLA, HA ou durabilidade local
+do broker equivalente à AWS. Workers principais não têm healthcheck HTTP; o ambiente
+distribuído usa startup/heartbeat de teste e cenários funcionais. C16/C45 e a decisão
+de reversões precisam ser tratados antes de anunciar conformidade completa.
+
+Para preparar o envio:
+
+1. Revisar/aprovar as propostas P1; não ocultar a diferença de política ao avaliador.
+2. Decidir a remediação/aceitação dos avisos de dependências e da forma Inbox/Outbox.
+3. Após alterações aprovadas, repetir a bateria e atualizar a matriz/parecer com a
+   nova execução; não reutilizar este PASS para um novo schema ou lockfile.
+4. Revisar `git status`, `git diff --check`, diffs e arquivos novos. Incluir fonte,
+   migrations, lockfile, documentação e evidências selecionadas; excluir somente
+   do pacote os caminhos já ignorados. Não enviar .env, node_modules, dist, .tools
+   ou logs brutos. Nenhum arquivo precisa ser removido do disco para essa seleção.
+5. Fornecer README e comandos abaixo. Se criar ZIP, revisar a seleção explicitamente;
+   nenhum ZIP, commit ou publicação foi realizado nesta etapa.
+
+Comandos de reprodução funcional, em checkout com Bun/Docker disponíveis:
+
+```text
+bun install --frozen-lockfile
+bun run test:build
+bun run test
+bun run test:integration:docker
+bun run test:distributed:docker --evidence-dir docs/stage-8
+bun run test:load --evidence-dir docs/stage-8
+bun audit --json
+```
+
+O audit retorna exit 1 enquanto os avisos permanecerem. Fluxo de aplicação em máquina
+limpa: preparar `.env.example` conforme README e executar `bun run stack:scale`;
+para isolamento sem tocar no principal, usar o override/comandos de
+[AUDIT.md](docs/stage-8/AUDIT.md). Ele não exige dados manuais, publica nenhuma porta
+e usa PostgreSQL tmpfs/banco exclusivo. Não executar upgrade no principal por engano.
+
+Sugestão de commit **apenas para revisão**, sem criá-lo:
+
+```text
+docs: consolida auditoria final e registra pendências de conformidade
+```
+
+## J. Parecer final
+
+**NÃO PRONTO.** A documentação/auditoria está concluída, mas o projeto não atende
+a todos os critérios de conformidade da entrega final. Testes financeiros e
+distribuídos PASS não anulam a ausência do ponto de extensão condicional, o risco de
+interpretação financeira pendente e a diferença de modelagem declarada. Corrigir ou
+obter aceite explícito desses pontos requer a decisão descrita nas propostas.
+Nenhuma etapa adicional, atualização, exclusão, commit ou publicação foi iniciada.

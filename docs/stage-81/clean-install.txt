@@ -1,0 +1,16 @@
+docker build --no-cache --target runtime -t jungle-stage81-clean:runtime .
+
+#8 [dependencies 4/4] RUN bun install --frozen-lockfile
+#8 0.554 bun install v1.4.4 (38afee6c8)
+#8 4.503 233 packages installed [3.95s]
+#9 [production-dependencies 4/4] RUN bun install --frozen-lockfile --production
+#9 0.595 bun install v1.4.4 (38afee6c8)
+#9 4.430 221 packages installed [3.83s]
+#8 [dependencies 4/4] RUN bun install --frozen-lockfile
+#14 [build 5/5] RUN bun run build
+#14 0.305 $ bun run typecheck && bun node_modules/typescript/bin/tsc -p tsconfig.build.json
+#14 0.310 $ bun node_modules/typescript/bin/tsc --noEmit
+#14 [build 5/5] RUN bun run build
+#18 naming to docker.io/library/jungle-stage81-clean:runtime done
+#18 unpacking to docker.io/library/jungle-stage81-clean:runtime
+#18 unpacking to docker.io/library/jungle-stage81-clean:runtime 3.6s done

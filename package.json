@@ -32,6 +32,10 @@
     "queues:init": "bun scripts/init-queues.ts",
     "healthcheck": "bun scripts/healthcheck.ts"
   },
+  "overrides": {
+    "ajv": "8.18.0",
+    "multer": "2.5.0"
+  },
   "dependencies": {
     "@aws-sdk/client-sqs": "3.1159.0",
     "@mikro-orm/core": "6.6.17",

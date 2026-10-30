@@ -11,9 +11,11 @@ Implementados Money, Wallet, WagerTransaction, FinancialPolicy, WalletLedgerEntr
 erros tipados. São classes sem dependências de NestJS, MikroORM, PostgreSQL ou AWS.
 A única biblioteca externa do domínio é decimal.js.
 
-Não há processamento operacional persistente, endpoint financeiro, consumer, publisher,
-worker, autenticação ou controle de concorrência distribuída. Nenhuma tabela/migration
-financeira foi criada ou modificada. O schema continua aguardando aprovação separada.
+O domínio puro desta especificação foi integrado a persistência, endpoints, consumer,
+publisher, scheduler e concorrência distribuída nas Etapas 3–7. Autenticação externa
+continua ausente. Os trechos de planejamento no final são registros históricos,
+não pendências atuais de implementação de persistência. A auditoria da Etapa 8
+mantém a política financeira e identifica riscos em [FINAL_REVIEW.md](../FINAL_REVIEW.md).
 
 O enunciado original está preservado em [CHALLENGE.md](CHALLENGE.md).
 
@@ -163,7 +165,7 @@ Mantidos os nomes específicos da Etapa 0 para saldo de reversão e duplicidade,
 de introduzir sinônimos concorrentes. REFERENCE_NOT_FOUND identifica expiração ou
 esgotamento de referência na Etapa 6. Antes desses limites, a referência permanece pendente.
 
-## Resultado terminal e futuro replay persistente
+## Resultado terminal e replay persistente
 
 Implementado no domínio: `TerminalResult`, congelado e JSON-safe, contendo:
 
@@ -179,7 +181,10 @@ a moeda real da wallet observada, não atribui artificialmente a moeda inválida
 `toState/rehydrate` preservam esse snapshot. Movimentações posteriores da wallet não
 alteram o resultado anterior. Nenhum snapshot contém Date mutável ou bigint não serializável.
 
-**Especificação para a etapa de persistência, ainda não implementada/aprovada:**
+**Registro da especificação original anterior às Etapas 3–4.** A persistência e o
+replay foram implementados e testados; o contrato HTTP é derivado do snapshot,
+sem outra cópia de body/status. A lista histórica abaixo não substitui
+[HTTP_API.md](HTTP_API.md) e [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 1. Gravar estado terminal, snapshot, saldo materializado, ledger e eventos no mesmo commit;
    incluir inbox quando aplicável. Nenhuma resposta de sucesso antes desse commit.
@@ -203,7 +208,11 @@ As novas instâncias imutáveis não fornecem, isoladamente, idempotência persi
 duas vezes o mesmo estado PENDING antigo pode produzir duas decisões iguais; o futuro
 Unit of Work deve carregar o estado atual sob lock e confirmar uma única operação.
 
-## Condição obrigatória antes de migrations financeiras
+## Registro da condição de aprovação das migrations financeiras
+
+As migrations existentes receberam aprovação posterior, registrada em docs/stage-3
+e docs/stage-6. A exigência de revisão continua valendo para novas alterações,
+inclusive a proposta de reversões da auditoria final; nenhum novo DDL foi aplicado.
 
 Apresentar para revisão e nova autorização o SQL completo, incluindo corpos das funções,
 constraints, índices, triggers e permissões, além de plano de up/down e testes negativos:

@@ -1,188 +1,127 @@
 # Jungle Wagering — Distributed Wagering Processor
 
-Distributed Wagering Processor em Bun, TypeScript strict e NestJS.
+Serviço financeiro distribuído para processar apostas de provedores com dinheiro
+exato, idempotência persistente e ledger auditável. HTTP e SQS compartilham o mesmo
+processador transacional PostgreSQL. A entrega da fila é at-least-once.
 
-**Estado: Etapa 7 — validação distribuída e observabilidade.**
-Resultado, matriz e evidências em [docs/stage-7/RESULT.md](docs/stage-7/RESULT.md).
-Há endpoints REST, DTOs validados, paginação estável do ledger, replay HTTP persistente,
-reconciliação e rastreamento de requests, reutilizando a unidade de trabalho ACID da Etapa 3.
-Consumer SQS FIFO e publisher separado usam inbox/outbox no mesmo commit financeiro,
-com retry, DLQ e recuperação após crash. Scheduler separado resolve referências pendentes
-com prazo persistido, backoff e orçamento de tentativas. Autenticação externa permanece
-fora do escopo. Contratos e operação: [docs/MESSAGING.md](docs/MESSAGING.md) e
-[docs/PENDING_REFERENCES.md](docs/PENDING_REFERENCES.md).
+**Remediação 8.1:** [FINAL_REVIEW.md](FINAL_REVIEW.md). Guard de extensão, classes
+Inbox/Outbox e patches transitivos foram incorporados após aprovação.
+O enunciado original está preservado em [docs/CHALLENGE.md](docs/CHALLENGE.md).
 
-Rotas, exemplos, status HTTP, paginação e idempotência em [docs/HTTP_API.md](docs/HTTP_API.md).
+## Tecnologias e ambiente
 
-Enunciado preservado em [docs/CHALLENGE.md](docs/CHALLENGE.md). Matriz de reversões,
-abertura zero e contrato futuro de replay em [docs/DOMAIN.md](docs/DOMAIN.md).
-
-DDL aprovado após revisão integral em [docs/stage-3/REVIEW.md](docs/stage-3/REVIEW.md).
-As propostas originais são preservadas como registro; a migration oficial incorpora
-o mesmo SQL. Resultados e arquivos da implementação estão em [VALIDATION.md](VALIDATION.md).
-
-## Pré-requisitos e versões
-
-- Bun **1.4.4** (runtime, package manager e test runner).
-- Docker Engine com containers Linux e Docker Compose **2.24+**; no Windows, Docker Desktop.
-- Portas locais disponíveis para PostgreSQL e LocalStack, ou portas alternativas no `.env`.
-
-Dependências diretas fixadas:
-
-| Dependência | Versão |
+| Componente | Versão fixada/verificada |
 |---|---|
-| NestJS common/core/platform-express | 11.2.8 |
-| MikroORM core/postgresql/migrations | 6.6.17 |
-| AWS SDK client-sqs | 3.1159.0 |
-| Smithy node-http-handler | 4.13.0 |
+| Bun | 1.4.4; desafio exige Bun 1.x |
+| TypeScript | 5.9.3, strict |
+| NestJS | 11.2.8 |
+| MikroORM | 6.6.17, PostgreSQL e migrations |
+| PostgreSQL | 17.11-alpine, container real |
+| LocalStack | 4.12.0, SQS FIFO local |
+| AWS SDK SQS | 3.1159.0 |
 | decimal.js | 10.6.0 |
-| reflect-metadata | 0.2.2 |
-| rxjs | 7.8.2 |
-| TypeScript | 5.9.3 |
-| @types/bun | 1.4.4 |
-| @types/express | 5.0.6 |
+| Docker/Compose usados na auditoria | 29.9.2 / v5.6.1 |
 
-Imagens configuradas: `oven/bun:1.4.4`, `postgres:17.11-alpine` e
-`localstack/localstack:4.12.0`. Dependências foram instaladas com Bun e estão em
-`bun.lock`. As três imagens foram baixadas e executadas: 7 testes de integração passaram,
-a migration foi validada com up/down/up e três réplicas responderam live/ready com HTTP 200.
+É necessário Docker Engine com containers Linux, Compose com suporte a condições
+health/completed e Bun no PATH. No Windows foi usado Docker Desktop/PowerShell.
+PostgreSQL e SQS não precisam estar instalados no host. As imagens são fixadas;
+não se recomenda atualizar versões sem repetir a validação. As dependências estão
+em `bun.lock`; consulte a auditoria de dependências antes de expor o serviço.
 
-LocalStack 4.12.0 é uma versão Community fixada anterior à exigência de autenticação
-da distribuição atual. Evita conta/token para o exercício local; não é uma recomendação
-de produção. Ao atualizar a imagem, revisar os requisitos de licença/autenticação e
-executar novamente os testes. Referências:
-[release 4.12.0](https://github.com/localstack/localstack/releases/tag/v4.12.0) e
-[mudança de distribuição](https://blog.localstack.cloud/the-road-ahead-for-localstack/).
+## Arquitetura
 
-## Instalação e configuração
+```text
+src/domain/                 Money, Wallet, WagerTransaction, ledger e política
+src/application/financial/  comandos, consultas, hash, reconciliação e portas
+src/application/messaging/  envelopes e eventos de integração tipados
+src/infrastructure/         PostgreSQL, SQS, schedulers, configuração e métricas
+src/interfaces/http/        controllers, DTOs, respostas e erros
+src/workers/                entrypoint separado por papel
+scripts/                    bootstrap, migrations, probes e runners Docker
+```
+
+Controllers traduzem o contrato HTTP. API e consumer chamam `FinancialService`;
+o scheduler reaproveita sua avaliação financeira. Repositories implementam as
+portas da aplicação. O domínio não depende de NestJS, ORM ou SDK AWS. Fluxos,
+limites de confiança e trade-offs estão em [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Instalação e execução em uma máquina limpa
+
+Os comandos abaixo pressupõem checkout novo, portas livres e ausência de banco de
+uma instalação anterior. Preserve um `.env` existente; não o sobrescreva para
+atualizar uma instalação. Os valores do exemplo são apenas credenciais locais.
 
 ```powershell
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 bun install --frozen-lockfile
-```
-
-Em shells POSIX, use `cp .env.example .env`. Bun carrega `.env` automaticamente.
-O arquivo contém somente credenciais locais de exemplo. Não reutilizá-las fora do
-ambiente de desenvolvimento. `.env` está excluído do Git e do contexto Docker.
-
-Variáveis relevantes:
-
-| Variável | Uso |
-|---|---|
-| NODE_ENV | development, test ou production |
-| HOST / PORT | Bind HTTP; zero é permitido para porta efêmera em testes |
-| LOG_LEVEL | debug, info, warn ou error |
-| DB_HOST / DB_PORT / DB_NAME | Conexão PostgreSQL |
-| DB_USER / DB_PASSWORD | Login runtime para execução no host |
-| ADMIN_DB_USER / ADMIN_DB_PASSWORD | Administração, somente no job de bootstrap |
-| MIGRATION_DB_USER / MIGRATION_DB_PASSWORD | Login restrito do job/comando de migrations |
-| RUNTIME_DB_USER / RUNTIME_DB_PASSWORD | Login runtime usado pelo Compose |
-| DB_POOL_MAX | Máximo de conexões por processo |
-| DEPENDENCY_TIMEOUT_MS | Timeout de dependências; padrão 2000 |
-| AWS_REGION | Região SQS |
-| AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY | Credenciais locais SQS |
-| SQS_ENDPOINT | Endpoint sem credenciais, query string ou path adicional |
-| SQS_QUEUE_NAME / SQS_DLQ_NAME | Nomes FIFO distintos |
-| SQS_MAX_RECEIVE_COUNT | Redrive após tentativas; padrão 5 |
-| SQS_VISIBILITY_TIMEOUT_SECONDS | Visibilidade da fila principal; padrão 30 |
-| SQS_EVENTS_QUEUE_NAME / SQS_EVENTS_DLQ_NAME | Fila FIFO de eventos e sua DLQ |
-| SQS_WAIT_SECONDS / CONSUMER_CONCURRENCY | Long polling (20s) e loops por consumer (4) |
-| MESSAGING_RETRY_BASE_SECONDS / MESSAGING_RETRY_CAP_SECONDS | Backoff com jitter; 1s/300s |
-| OUTBOX_BATCH_SIZE / OUTBOX_LEASE_SECONDS / OUTBOX_MAX_ATTEMPTS | Claim: 10 eventos, lease 30s, 20 tentativas |
-| OUTBOX_POLL_MS / WORKER_SHUTDOWN_TIMEOUT_MS | Polling 1000ms e drenagem 10000ms |
-| PENDING_REFERENCE_TTL_SECONDS / PENDING_REFERENCE_MAX_ATTEMPTS | Prazo inicial de 86400s; 20 avaliações totais |
-| PENDING_REFERENCE_BASE_SECONDS / PENDING_REFERENCE_CAP_SECONDS | Backoff de pendência: base 1s, teto 300s |
-| PENDING_REFERENCE_POLL_MS / PENDING_REFERENCE_BATCH_SIZE | Polling 1000ms; até 20 transações curtas por ciclo |
-| PENDING_REFERENCE_IDLE_TIMEOUT_MS | Timeout local de sessão ociosa dentro da tentativa: 10000ms |
-| POSTGRES_HOST_PORT / LOCALSTACK_HOST_PORT | Portas publicadas no host |
-| APP_HOST_PORT | Vazio/zero: porta dinâmica; valor fixo apenas para uma réplica |
-
-Configuração inválida impede o bootstrap e informa os nomes das variáveis, sem imprimir
-seus valores. O Compose usa nomes DNS internos (`postgres`, `localstack`), independentemente
-das portas publicadas no host.
-
-## Execução completa em Docker Compose
-
-```text
-bun run stack:up
+bun run stack:scale
 bun run services:status
-docker compose port app 3000
-```
-
-Inicialização: PostgreSQL saudável → job `database-bootstrap` (fundação e acesso)
-→ job `migrate` com proprietário restrito → aplicação. LocalStack e job `queues`
-também devem estar prontos. A aplicação recebe somente credenciais runtime; nenhuma
-migration ou sincronização roda em seu startup. `queues` cria automaticamente:
-
-- `wager-transactions.fifo`: FIFO, deduplicação explícita, visibilidade 30s,
-  long polling 20s, retenção 4 dias, redrive para DLQ após 5 recebimentos.
-- `wager-transactions-dlq.fifo`: FIFO, retenção 14 dias.
-- `wager-events.fifo`: FIFO de eventos, mesmos parâmetros de polling, redrive e visibilidade.
-- `wager-events-dlq.fifo`: FIFO, retenção 14 dias; destinada a subscribers futuros.
-
-Os parâmetros de visibilidade/tentativas vêm das variáveis. Repetir a inicialização
-com os mesmos atributos é seguro; mudar atributos de filas existentes exige atualização
-operacional explícita, sem apagar mensagens silenciosamente.
-
-API, consumer e publisher são processos separados no Compose. `bun run stack:scale`
-inicia três APIs, três consumers, dois publishers e três schedulers de referências. Workers não expõem HTTP; seus logs
-registram início, falhas e snapshots de métricas a cada 10s. Para executar no host após
-bootstrap/migrations e `bun run queues:init`:
-
-```text
-bun run worker:consumer
-bun run worker:publisher
-bun run worker:pending-reference
-```
-
-A migration `20261029000100` concede escrita mínima de mensageria, permite o evento
-de referência pendente e acrescenta sequência de publicação e diagnóstico. Não
-reescreve migrations financeiras aprovadas. Seu rollback recusa inbox/outbox com dados.
-Os testes usam Compose e bancos descartáveis; não migram o banco de desenvolvimento.
-
-A migration `20261029000200`, aprovada para a Etapa 6, acrescenta prazo imutável de
-referência e seu índice/grant. **Antes do upgrade, drenar/parar os writers antigos**:
-
-```text
-docker compose stop app consumer publisher pending-reference
-bun run stack:scale
-```
-
-O novo schema exige deadline ao entrar em PENDING_REFERENCE; a versão antiga não pode
-continuar escrevendo durante esse upgrade. Pendências legadas recebem created_at + 24h
-e podem já estar vencidas quando o scheduler iniciar. A migration altera só metadados,
-sem liquidar pendências ou alterar saldo/ledger. Rollback recusa remover prazos históricos.
-Confira credenciais e jobs de bootstrap/migration descritos abaixo antes de atualizar um
-ambiente existente. Nenhum comando de upgrade no desenvolvimento foi executado pelos testes.
-
-O banco persiste no volume `postgres-data`. LocalStack pode reconstruir as filas
-no próximo `stack:up`; retenção persistente do broker não é oferecida nesta fundação.
-Somente portas ligadas a `127.0.0.1` são publicadas. A imagem da aplicação executa
-como usuário `bun`, com init e prazo de shutdown de 15 segundos.
-
-Na máquina usada na validação, a porta 5432 já estava ocupada por outro processo.
-O `.env` local (ignorado pelo Git) usa `POSTGRES_HOST_PORT=15432` e `DB_PORT=15432`;
-o PostgreSQL dentro do Compose continua em 5432. O serviço existente foi preservado.
-
-### Três réplicas
-
-Deixe `APP_HOST_PORT` vazio/zero:
-
-```text
-bun run stack:scale
-docker compose ps app
 docker compose port --index 1 app 3000
 docker compose port --index 2 app 3000
 docker compose port --index 3 app 3000
 ```
 
-Cada réplica tem sua porta de host dinâmica. Não há `container_name`, mutex global
-ou porta de host fixa por réplica. A concorrência financeira foi validada separadamente
-com três processos, pools e conexões independentes no teste das 50 duplicatas.
+`stack:scale` inicia três APIs, três consumers, dois publishers e três schedulers.
+As portas HTTP são dinâmicas e ligadas a 127.0.0.1. Use a porta anunciada para cada
+API; `APP_HOST_PORT` deve continuar vazio/zero ao escalar. PostgreSQL e LocalStack
+usam 5432 e 4566 no host por padrão; altere `POSTGRES_HOST_PORT` e
+`LOCALSTACK_HOST_PORT` se ocupadas. `bun run stack:up` inicia uma instância por papel.
 
-## Desenvolvimento com Bun no host
+A ordem de inicialização é PostgreSQL saudável → bootstrap administrativo →
+migrations com owner restrito → aplicação/workers; filas são provisionadas após
+LocalStack saudável. A aplicação nunca executa DDL no startup. O runtime da imagem
+final usa o usuário `bun` e recebe somente credenciais PostgreSQL de runtime.
+
+Para encerrar, preservando o volume PostgreSQL:
 
 ```text
+docker compose down
+```
+
+Não use `down -v` em dados a preservar. O estado persistente do LocalStack não é
+oferecido por este Compose: reiniciar o broker pode exigir recriar filas; não é uma
+promessa de durabilidade equivalente à AWS. O banco principal desta máquina está
+com uma instalação antiga; a auditoria não o atualizou. Para avaliar sem afetá-lo,
+use os runners descartáveis da seção Testes.
+
+## Configuração
+
+`.env.example` documenta todas as variáveis. Grupos principais:
+
+| Variáveis | Responsabilidade |
+|---|---|
+| DB_HOST/PORT/NAME, DB_USER/PASSWORD, DB_POOL_MAX | Conexão/pool por processo |
+| ADMIN_DB_* | Somente bootstrap administrativo |
+| MIGRATION_DB_* | Somente migrations, com owner restrito |
+| RUNTIME_DB_* | Login não administrativo dos containers de aplicação |
+| AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SQS_ENDPOINT | LocalStack local |
+| SQS_*QUEUE_NAME, SQS_*DLQ_NAME | Quatro filas FIFO distintas |
+| SQS_WAIT_SECONDS, SQS_VISIBILITY_TIMEOUT_SECONDS, SQS_MAX_RECEIVE_COUNT | Polling, visibilidade e limite de recebimentos |
+| CONSUMER_CONCURRENCY, MESSAGING_RETRY_*, OUTBOX_* | Concorrência, retry, claims/leases e publicação |
+| PENDING_REFERENCE_* | TTL, orçamento, backoff, polling e timeout de sessão |
+| HOST, PORT, LOG_LEVEL, DEPENDENCY_TIMEOUT_MS | Bind, logging e timeouts |
+
+Configuração inválida falha sem imprimir valores sensíveis. Dentro do Compose,
+os endereços são `postgres:5432` e `http://localstack:4566`, independentemente das
+portas de host. Dimensione o total de conexões considerando APIs e todos os workers.
+Os defaults/credenciais locais não são uma configuração de produção.
+
+## Banco, migrations e atualização de instalações
+
+As quatro migrations versionadas criam namespace, modelo financeiro, permissões de
+mensageria e deadline persistido de referências. Bootstrap, migrator e runtime têm
+papéis separados. Runtime não pode ser superuser/owner e não acessa o histórico de
+migrations. As entidades ORM mapeiam NUMERIC para string e versões para bigint.
+
+```text
+bun run migration:status
+```
+
+Esse comando precisa das credenciais de migrator e de conexão adequadas ao host.
+Na inicialização via Compose, jobs fazem o provisionamento e o upgrade. Para
+trabalhar no host, prepare as credenciais do `.env.example`, então:
+
+```powershell
 bun run services:up
 $env:ALLOW_DATABASE_BOOTSTRAP = '1'
 bun run database:bootstrap
@@ -191,143 +130,172 @@ bun run queues:init
 bun run dev
 ```
 
-`services:up` inicia somente PostgreSQL e LocalStack. Para a aplicação no host,
-use `DB_HOST=127.0.0.1` e `SQS_ENDPOINT=http://127.0.0.1:4566` (ou portas alteradas).
-`bun run start` executa o fonte; `bun run start:prod` executa o build.
+Não execute esse fluxo indiscriminadamente em uma instalação existente. Antes da
+migration de deadlines, drene/pare os writers antigos: o schema passa a exigir prazo
+em PENDING_REFERENCE. O backfill usa created_at + 24h; pendências antigas podem já
+estar vencidas ao iniciar o scheduler. Revise [docs/PENDING_REFERENCES.md](docs/PENDING_REFERENCES.md).
 
-O comando `$env:...` acima é PowerShell; em POSIX use
-`ALLOW_DATABASE_BOOTSTRAP=1 bun run database:bootstrap`. Configure os três pares de
-credenciais do `.env.example`. Um `.env` antigo da Etapa 1 precisa ser ajustado para
-usar login runtime no host. Operações financeiras recusam superuser, owner e roles
-administrativas (`UNSAFE_DATABASE_ROLE`). O bootstrap inspeciona atributos e memberships
-de roles existentes, não redefine senhas existentes nem apaga dados/volumes.
+Rollback é estrutural e recusa apagar histórico financeiro. O comando `migration:down`
+exige NODE_ENV=test, banco `jungle_wagering_test` ou com esse prefixo e
+ALLOW_MIGRATION_DOWN=1. Os testes verificam up/down/up em bancos novos e recusas com
+dados; não é permitido esvaziar ledger para tornar um rollback possível.
 
-## Health checks e logs
+## API REST
 
-```text
-GET /health/live
-GET /health/ready
+| Método | Rota |
+|---|---|
+| POST | /wallets |
+| GET | /wallets/:walletId |
+| GET | /wallets/:walletId/ledger?limit=50&cursor=... |
+| POST | /wagering/transactions |
+| GET | /wagering/transactions/:transactionId |
+| GET | /providers/:providerId/wagering/transactions/:externalTransactionId |
+| POST | /wallets/:walletId/reconciliation |
+| GET | /health/live |
+| GET | /health/ready |
+
+Exemplos de bodies; use a URL/porta obtida com `docker compose port`:
+
+```json
+{"playerId":"player-demo","initialBalance":{"amount":"100.00","currency":"BRL"}}
 ```
 
-- Liveness: 200 com `{"status":"ok"}`, mesmo sem banco/broker.
-- Readiness: 200 apenas quando o PostgreSQL responde, a migration do namespace
-  está aplicada e ambas as filas possuem configuração esperada.
-- Falha de dependência: 503 com estados `up`/`down`, sem URLs, credenciais ou SQL.
-- Nenhuma rota exige autenticação nesta etapa.
-- Requests propagam/geram `x-correlation-id`; logs são JSON, sem body ou query string.
+Após criar a wallet, envie uma BET para `/wagering/transactions`, com
+`Content-Type: application/json` e `Idempotency-Key: provider-demo:bet-1`:
 
-O container usa readiness como health check. Readiness indisponível não muda a
-semântica da liveness nem implica restart automático de container apenas por estar unhealthy.
-
-## Migrations
-
-```text
-bun run migration:status
-bun run migration:up
+```json
+{
+  "providerId":"provider-demo",
+  "externalTransactionId":"bet-1",
+  "playerId":"player-demo",
+  "walletId":"ID_DA_WALLET_CRIADA",
+  "roundId":"round-demo",
+  "gameId":"game-demo",
+  "kind":"BET",
+  "money":{"amount":"80.00","currency":"BRL"}
+}
 ```
 
-`Migration20261028000100` cria somente o namespace `wagering`. O histórico é mantido
-pelo MikroORM. A reversão faz `DROP SCHEMA ... RESTRICT`, sem CASCADE.
+Dinheiro sempre usa string decimal com duas casas; versões são strings no JSON.
+DTOs recusam campos desconhecidos, tipos incorretos e OPENING externo. O header
+Idempotency-Key é obrigatório e único. Respostas distinguem 400 inválido, 404 ausente,
+409 conflito, 422 rejeição financeira, 202 pendente, 200 processado e 503 transitório.
+FAILED persistido retorna 500 com snapshot; erros inesperados são sanitizados.
+Contratos completos, paginação e exemplos em [docs/HTTP_API.md](docs/HTTP_API.md).
 
-`Migration20261028000200` cria wallets, transações, ledger, inbox/outbox e suas proteções.
-O down financeiro exige tabelas vazias, trava antes da verificação e não remove roles.
-O bootstrap administrativo provisiona grupos separados; todas as conexões do migrator
-assumem `wagering_owner`, enquanto o runtime não acessa o histórico MikroORM.
+**Autenticação externa não implementada:** os endpoints financeiros estão abertos
+na rede local. NoopProviderIdentityGuard é a extensão explícita para futuro OIDC/JWKS;
+permite acesso sem criar identidade confiável. Health não usa esse guard;
+SQS é tratado como canal interno confiável, com validação dos campos do provedor.
 
-O script de rollback exige **todos** estes critérios:
+## Processamento financeiro e reversões
 
-- `NODE_ENV=test`;
-- nome de banco `jungle_wagering_test` ou com prefixo `jungle_wagering_test_`;
-- `ALLOW_MIGRATION_DOWN=1`.
+| Operação | Efeito |
+|---|---|
+| BET | Débito; saldo insuficiente gera REJECTED/INSUFFICIENT_FUNDS |
+| WIN | Crédito |
+| LOSS | Registra PROCESSED sem alterar saldo, versão ou ledger |
+| REFUND | Crédito integral de uma BET válida processada |
+| ROLLBACK | Inverso de BET, WIN ou REFUND; débito sem fundos gera REVERSAL_INSUFFICIENT_FUNDS |
+| OPENING | Interno; abertura positiva cria crédito/transação/ledger atomicamente |
 
-Exemplo em PowerShell, somente após configurar um banco de teste descartável:
+Abertura zero tem versão 1 e ledger vazio. Cada mudança de saldo incrementa a versão
+e insere exatamente um lançamento. Estados terminais e ledger são imutáveis no
+banco; a reconciliação reconstrói o saldo em snapshot consistente e nunca repara
+uma divergência automaticamente.
 
-```powershell
-$env:NODE_ENV = 'test'
-$env:DB_NAME = 'jungle_wagering_test'
-$env:ALLOW_MIGRATION_DOWN = '1'
-bun run migration:down
-```
+A política atual permite **uma reversão direta processada por referência**, unindo
+REFUND e ROLLBACK na mesma exclusão. Ela é mais restritiva que a unicidade por
+referência/tipo do item 7.4 do desafio. A manutenção dessa interpretação foi aprovada
+na Etapa 8.1: preserva a unicidade por tipo e evita dupla compensação econômica;
+a restrição adicional continua explícita ao avaliador. ROLLBACK de REFUND é permitido
+e não reabre o direito sobre a BET original. Nenhuma regra foi alterada na auditoria.
 
-O teste de integração faz up/down/up em um banco novo com nome aleatório e o remove
-ao terminar. Não roda rollback em bancos de desenvolvimento existentes. A execução
-registrada nesta entrega preservou o banco e o volume de desenvolvimento.
+## Idempotência
 
-## Qualidade e testes
+Idempotency-Key é global; `(providerId, externalTransactionId)` também é único.
+O hash v1 usa SHA-256 de JSON de array em ordem documentada, com dinheiro canônico
+e referência ausente como null; não inclui a chave nem metadados de transporte.
+Chave/identidade/hash compatíveis retornam o registro existente. Divergências geram
+409, incluindo mesma identidade externa com outra chave e chave entre wallets.
+
+Replay terminal usa o snapshot original de saldo/versão/instante. Movimentos
+posteriores e reinicialização não o recalculam. Pendências retornam 202 sem forçar
+resolução. PostgreSQL, não cache em memória ou deduplicação do SQS, garante unicidade.
+
+## SQS, Inbox e Outbox
+
+Filas de comandos/eventos e suas DLQs são FIFO. MessageGroupId deriva da wallet;
+IDs de deduplicação são estáveis. O consumer valida o envelope, adquire Inbox,
+processa o financeiro e grava ledger/outbox/inbox em um único commit. Só então
+executa DeleteMessage. Rejeição financeira confirmada também recebe ACK.
+
+O publisher faz claim SQL com SKIP LOCKED, lease e fencing; a chamada SQS ocorre
+fora da transação financeira e após seu commit. Dois publishers podem coexistir.
+Crash depois de enviar e antes de marcar permite republicação do mesmo eventId;
+subscribers precisam deduplicar persistentemente. Não se promete exactly-once no SQS.
+
+Retries têm backoff exponencial/jitter e limite; mensagens inválidas/permanentes ou
+esgotadas seguem para DLQ. Outbox esgotada permanece durável no PostgreSQL e bloqueia
+a sequência daquela wallet até intervenção; não é descartada. Operação e replay de
+DLQ estão em [docs/MESSAGING.md](docs/MESSAGING.md).
+
+## Referências pendentes
+
+REFUND/ROLLBACK antes da referência persistem PENDING_REFERENCE e são retomadas por
+scheduler, sem depender de replay HTTP. Defaults: TTL 24h, 20 avaliações totais,
+base 1s e teto 300s com jitter. Prazo é persistido/imutável. Limite/TTL esgotado gera
+REJECTED/REFERENCE_NOT_FOUND, sem ledger; indisponibilidade SQL não consome tentativa.
+Claim e resolução usam a mesma transação curta e ordem wallet → transação. SIGKILL
+libera locks e outra instância retoma. Detalhes em [docs/PENDING_REFERENCES.md](docs/PENDING_REFERENCES.md).
+
+## Testes e reprodução isolada
 
 ```text
-bun run typecheck
-bun run build
-bun run test
 bun run test:build
+bun run test
 bun run test:integration:docker
-bun run test:distributed:docker
-bun run test:load
+bun run test:distributed:docker --evidence-dir docs/stage-81
+bun run test:load --evidence-dir docs/stage-81
+bun audit --json
 ```
 
-O build usa o compilador TypeScript executado pelo Bun, preservando os decorators e
-metadados esperados pelo NestJS. O resultado fica em `dist/`.
+Os runners Docker usam projetos aleatórios, PostgreSQL tmpfs e LocalStack próprios,
+sem portas de host, dados manuais ou volumes principais. A suíte distribuída executa
+três APIs, três consumers, dois publishers e três schedulers em containers distintos;
+verifica A–E, duplicatas, FIFO, SIGKILL/reinício, backlog, replay e reconciliação.
+`test:load` repete somente a carga em outro projeto. `--evidence-dir` salva novas
+execuções separadamente; sem a opção, o destino histórico continua docs/stage-7.
 
-`test:build` compila e inicia um processo separado a partir do JavaScript emitido,
-verificando live=200 e ready=503 sem dependências disponíveis.
+Unitários usam mocks quando apropriado; integração/distribuídos usam PostgreSQL e
+SQS reais. SIGKILL e SIGTERM são casos diferentes. Falha próxima ao COMMIT é conferida
+pela identidade persistida antes do retry. Resultados recentes, comandos, contagens
+e limites estão em [VALIDATION.md](VALIDATION.md) e na [matriz atual](docs/stage-81/CONFORMANCE.md).
+Overrides fixam Ajv 8.18.0 e Multer 2.5.0. Repita bun audit antes de atualizações ou
+exposição do serviço; ausência de advisories conhecidos não certifica segurança total.
 
-`test` cobre validação de ambiente, logging e um servidor Nest real com drivers apontados
-para dependências inacessíveis. Não substitui a suite de containers.
+## Decisões e limitações
 
-`test:integration:docker` cria um projeto Compose com nome aleatório, PostgreSQL em
-filesystem descartável e LocalStack real. Sem portas de host ou volumes compartilhados.
-Verifica conexão, transações SQL, filas, migrations reversíveis, endpoints e falha
-individual de cada dependência. A suíte financeira usa login runtime real sem privilégios
-administrativos, SQL inválido, rollback, três processos concorrentes, deadlock e reconciliação.
-Somente o administrador do container de teste pode criar os bancos descartáveis.
+- Locks pessimistas por wallet, transações curtas e retry inteiro limitado para
+  deadlock/serialização. Não há lock global financeiro ou rede dentro da UoW.
+- NUMERIC/string/decimal.js para dinheiro e bigint para versões/somas históricas.
+- InboxMessage/OutboxMessage têm factories, rehydrate e transições imutáveis usadas
+  pelos repositories. Claims, leases, tentativas e fencing continuam no PostgreSQL.
+- FAILED existe no domínio/schema e no replay; o fluxo normal não converte uma
+  indisponibilidade transitória ou expiração de referência em FAILED.
+- Métricas são snapshots JSON por processo a cada 10s, sem exporter/agregação/SLA.
+  Não substituem a auditoria SQL nem garantem contagem exata após commit incerto.
+- LocalStack e carga pequena não certificam AWS real, alta disponibilidade ou produção.
+- Sem frontend, IdP, double-entry, restore/failover ou teste de perda física de disco.
+- Overrides transitivos ultrapassam ranges fixados pelos pais; foram aprovados e
+  precisam de revisão nas próximas atualizações dos frameworks.
 
-Os E2E HTTP estão incluídos nessa suíte e usam três processos Nest com o JavaScript
-compilado, pools e conexões independentes. Fora do Docker, executar `bun run build`
-antes de `bun run test:integration`, além de configurar o ambiente administrativo de testes.
+## Evidências e preparação da entrega
 
-Para executar contra containers de teste já preparados, configure `NODE_ENV=test`,
-um `DB_NAME` isolado e as conexões, inicialize as filas e execute
-`bun run test:integration`. Sem pré-requisitos, a suite falha explicitamente; não transforma
-testes não executados em sucesso/skip silencioso.
-
-Validação efetuada neste ambiente: consulte [VALIDATION.md](VALIDATION.md).
-
-A Etapa 7 acrescenta `docker-compose.distributed-test.yml`: três containers API,
-três consumers, dois publishers e três schedulers, PostgreSQL tmpfs e LocalStack
-exclusivos. `test:distributed:docker` verifica saúde/identidades, A–E, idempotência,
-SQS, SIGKILL/reinício de todos os papéis e carga. `test:load` reproduz só a carga em
-outro projeto descartável. Não usam portas publicadas, volumes compartilhados ou
-Docker socket montado. Ambos requerem Docker Engine acessível e geram evidências em
-`docs/stage-7/`; removem somente os próprios containers/rede, sem `down -v`.
-
-Os probes de workers desse ambiente são supervisores exclusivos da imagem de testes:
-verificam startup e heartbeat do processo de produção. Não são um novo endpoint do
-produto nem prova de progresso financeiro durante indisponibilidade de dependências.
-As APIs testam tabelas/colunas essenciais no readiness; namespace isolado não basta.
-Logs de API e workers emitem snapshots de métricas a cada 10s. Contadores financeiros
-registram transições confirmadas na UoW, sem contar replay, OPENING ou rollback como
-uma nova transação de provedor. São observações por processo, sem agregador externo.
-
-## Troubleshooting
-
-- **Bun não encontrado:** instale Bun 1.x ou use a imagem Docker. O binário em `.tools/`
-  usado nesta sessão é local e ignorado pelo Git; não é pré-requisito do repositório.
-- **Docker não encontrado/Engine parado:** instalar/iniciar Docker Desktop com containers
-  Linux; então repetir a suite de integração. Não é resolvido por mocks.
-- **Porta ocupada:** mudar `POSTGRES_HOST_PORT`/`LOCALSTACK_HOST_PORT`; ajustar também as
-  variáveis de conexão usadas pelo Bun no host.
-- **Readiness 503 com banco acessível:** executar `migration:up`; verificar filas,
-  redrive, endpoint e região. Consultar `docker compose logs migrate queues`.
-- **Volume PostgreSQL com outra senha/banco:** mudar `.env` não altera usuários de um
-  cluster já inicializado. Usar outro projeto Compose/volume ou ajustar administrativamente;
-  não apagar o volume existente como correção automática.
-- **Fila existente com atributos diferentes:** revisar configuração e atualizar atributos
-  explicitamente. Não remover fila com mensagens.
-- **LocalStack atualizado pede token:** manter a versão fixada ou configurar a distribuição
-  nova conforme sua documentação antes de migrar.
-- **Rollback recusado:** o script permite apenas banco isolado de teste e opt-in explícito.
-
-`bun run services:down` para os serviços do projeto e preserva o volume PostgreSQL.
-Não executar `docker compose down -v` sobre dados a preservar.
-
-Decisões e próximos passos: [ARCHITECTURE.md](ARCHITECTURE.md).
+[FINAL_REVIEW.md](FINAL_REVIEW.md) contém o parecer, prioridades e orientações de
+entrega. [CONFORMANCE.md](docs/stage-81/CONFORMANCE.md) rastreia o enunciado original;
+[RESULT.md](docs/stage-81/RESULT.md) registra a remediação e suas verificações. Os registros
+das etapas anteriores foram preservados. Logs `.cache-*.log`, dist, node_modules,
+.tools e .env são locais/ignorados; não devem integrar um pacote de entrega.
+Nenhum arquivo foi excluído pela auditoria; veja o inventário de limpeza antes de
+aprovar remoções. Nenhum commit ou publicação é feito automaticamente.

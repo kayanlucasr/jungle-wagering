@@ -1,363 +1,289 @@
-# Arquitetura — Etapas 1 a 7
+# Arquitetura — Distributed Wagering Processor
 
-## Escopo e autorização
+Documento do comportamento atual. O enunciado é [docs/CHALLENGE.md](docs/CHALLENGE.md);
+a auditoria final e as divergências estão em [FINAL_REVIEW.md](FINAL_REVIEW.md).
+As revisões de SQL das etapas 3 e 6 são registros de aprovação preservados em docs/.
+A remediação 8.1 mantém schema, privilégios e política financeira; acrescenta a
+extensão de identidade, classes de mensageria e overrides transitivos aprovados.
 
-O enunciado oficial, originalmente lido em `C:/Users/Undead/Downloads/README.md`, está
-preservado em [docs/CHALLENGE.md](docs/CHALLENGE.md). A Etapa 0 está registrada no chat.
-O usuário autorizou a fundação na Etapa 1 e o domínio/testes na Etapa 2. Na Etapa 3,
-aprovou o plano, revisou integralmente os três SQLs e autorizou explicitamente sua execução.
+## Módulos e responsabilidades
 
-Há regras financeiras puras, persistência ACID, ledger protegido, idempotência persistente,
-API REST e reconciliação estruturada. A Etapa 4 usa as camadas e proteções aprovadas na
-Etapa 3, sem migrations ou novos privilégios. A Etapa 5 foi autorizada em 29/10/2026 e
-acrescenta consumer FIFO, inbox, outbox e publisher separado. A Etapa 6 foi aprovada após
-revisão de plano/DDL e acrescenta scheduler persistente de referências. Autenticação
-externa continua fora do escopo. Detalhes em [docs/MESSAGING.md](docs/MESSAGING.md) e
-[docs/PENDING_REFERENCES.md](docs/PENDING_REFERENCES.md).
+| Camada | Componentes | Responsabilidade |
+|---|---|---|
+| Domain | Money, Wallet, WagerTransaction, FinancialPolicy, WalletLedgerEntry | Invariantes, decisões e transições imutáveis |
+| Application | FinancialService, FinancialQueryService, reconciliation, portas | Coordenar use cases, hash/snapshots, referências e eventos |
+| HTTP | Controllers, DTOs, response mappers, exception filter | Contrato REST e tracing, sem cálculo financeiro ou SQL |
+| Persistence | MikroORM, UoW, repositories, mappers, migrations | Locks, ACID, tradução de registros e proteções SQL |
+| Messaging | SqsService, TransactionConsumer, OutboxPublisher | Transporte FIFO, ACK, visibilidade, retry/DLQ, publicação |
+| Pending reference | ReferenceScheduler e repository | Polling e claim, delegando a decisão ao FinancialService |
+| Observability/config | JsonLogger, métricas, loadConfig | Logs/snapshots e configuração validada |
 
-## Organização e dependências
+Dependências seguem Interfaces → Application → Domain. Infrastructure implementa
+as portas da Application. Domain importa apenas código do domínio e decimal.js;
+não importa NestJS, MikroORM, AWS SDK ou serviços externos. Application não importa
+infraestrutura. AppModule e entrypoints dos workers compõem os adapters.
 
-Monólito com camadas pragmáticas e princípios hexagonais:
-
-```text
-src/
-  app.module.ts                    composição de providers
-  bootstrap.ts                     servidor, contexto HTTP e lifecycle
-  main.ts                          entrypoint Bun
-  domain/                          Money, Wallet, transações, ledger e política financeira
-  application/financial/           serviço financeiro, portas, hash e reconciliação
-  interfaces/http/                 health e tradução de exceções
-  infrastructure/config/          configuração validada e imutável
-  infrastructure/persistence/     MikroORM, transações e migrations
-  infrastructure/messaging/       cliente SQS e verificação de filas
-  infrastructure/observability/   logs JSON
-scripts/                          migrations, filas, probes e runner de testes
-test/unit/                        domínio, configuração, logs e bootstrap HTTP
-test/integration/                 PostgreSQL/LocalStack reais
-test/support/                     fixtures sem credenciais reais
+```mermaid
+flowchart LR
+  HTTP[REST controllers] --> F[FinancialService]
+  SQS[SQS FIFO comandos] --> C[TransactionConsumer]
+  C --> F
+  R[ReferenceScheduler] --> F
+  F --> U[PostgresFinancialUnitOfWork]
+  F --> D[FinancialPolicy / domínio]
+  U --> DB[(PostgreSQL)]
+  P[OutboxPublisher] --> DB
+  P --> E[SQS FIFO eventos]
+  Q[FinancialQueryService / reconciliação] --> U
 ```
 
-Para este repositório vazio, a organização por camadas sugerida na Etapa 1 reduz
-navegação e arquivos de composição no início. Preserva os boundaries propostos na
-Etapa 0. Domain foi criado na Etapa 2; Application, entidades e repositories foram
-criados com conteúdo real na Etapa 3. Não há arquivos de workers vazios.
-
-Dependências: Interfaces → Application → Domain. Infrastructure implementa
-portas da Application. Domain não importa NestJS, MikroORM ou AWS SDK.
-Controllers e entidades persistidas não concentram decisões financeiras.
-
-## Stack e justificativas
-
-- Bun 1.4.4 para instalação, execução, compilador TS e testes.
-- NestJS 11.2.8, MikroORM 6.6.17 e TypeScript 5.9.3: linhas fixadas para evitar
-  introduzir simultaneamente versões principais novas. TypeScript strict e verificações
-  adicionais de opcionais e índices.
-- MikroORM PostgreSQL: Unit of Work e locks transacionais explícitos. Integração
-  via providers Nest locais, sem pacote de integração adicional nesta fundação.
-- AWS SDK v3 SQS com Smithy NodeHttpHandler: timeout explícito e sem retries ocultos
-  na readiness.
-- decimal.js usado pelo Money com configuração privada, precisão exata e strings canônicas.
-- JSON logger próprio com superfície pequena, sem dependência adicional.
-- Build via TypeScript, executado por Bun, com metadata de decorators preservada.
-- LocalStack Community 4.12.0 fixado para execução local sem conta externa. Sua atualização
-  requer revisar autenticação/licença e repetir a suite; não se usa `latest`.
-
-Versões instaladas e comandos estão no README e VALIDATION.
-
-## Persistência implementada
-
-`DatabaseService` inicializa metadados ORM sem exigir conexão no bootstrap. Isso permite
-liveness com dependências indisponíveis. Readiness abre conexão real e valida o namespace
-instalado. Não há criação automática de banco, schema synchronization ou migrations no
-bootstrap. O Compose executa um job de migration antes de iniciar a aplicação.
-
-- `allowGlobalContext=false`.
-- RequestContext separado por request HTTP.
-- Helper `transaction` cria fork e usa `EntityManager.transactional`.
-- Operações futuras de fila/job devem ter fork/contexto próprio.
-- Pool limitado por processo; dimensionar total considerando réplicas e workers.
-- Timeout de conexão, statement e lock configurados.
-- Nenhuma entidade monetária provisória foi introduzida.
-
-Migration `20261028000100`: cria namespace `wagering`; down usa RESTRICT.
-Migration `20261028000200`: incorpora exatamente o up/down financeiro aprovado,
-com cinco tabelas, três domains, vinte triggers e nove índices explícitos.
-
-O job administrativo `database-bootstrap` cria a fundação e provisiona acesso, separado
-do job `migrate`. Grupos NOLOGIN `wagering_owner` e `wagering_runtime` possuem logins
-distintos. Todas as conexões do migrator assumem o owner pelo parâmetro de conexão;
-runtime não acessa o histórico de migrations. A unidade de trabalho verifica a role
-efetiva e recusa superuser, privilégios administrativos ou membership no owner.
-
-Entidades ORM usam EntitySchema e campos escalares; FKs/constraints pertencem à migration.
-Mappers explícitos convertem registros em factories de reidratação, sem expor ORM ao
-domínio. NUMERIC usa strings, BIGINT usa bigint; padding de escala não arredonda valores.
-Snapshot JSON é copiado e serializado sem undefined antes de passar ao ORM, cujo tratamento
-de parâmetros modifica objetos. O snapshot congelado do domínio nunca é entregue ao ORM.
-
-O domain monetário usa NUMERIC sem typmod, limite de 18 inteiros/2 decimais e CHECK de
-escala/finitude. Isso evita arredondamento silencioso de NUMERIC(20,2) antes do CHECK.
-O domínio TypeScript continua exigindo strings canônicas e moeda reconhecida pelo runtime.
-No banco, currency tem formato de três letras e compatibilidade financeira por constraints.
-
-Triggers imediatos protegem identidade, estados terminais e snapshots; triggers diferidos
-vinculam cada mudança de saldo ao ledger e cada transação financeira ao seu efeito.
-O ledger é append-only: sem UPDATE/DELETE/TRUNCATE, por grants e triggers. O down recusa
-tabelas com dados e usa ACCESS EXCLUSIVE antes da verificação, sem CASCADE.
-
-## HTTP e observabilidade implementados
-
-- Sem prefixo de rota, preservando os caminhos oficiais.
-- Health público: live não consulta dependências; ready consulta banco e filas.
-- Readiness verifica FIFO, redrive, ARN da DLQ e visibility timeout.
-- Exceções traduzidas sem raw SQL, URLs ou payloads.
-- Correlation ID validado/gerado e devolvido em header.
-- Logs JSON de request contêm método, status, duração e correlation ID; não body/query.
-- Shutdown hooks para SIGTERM/SIGINT fecham pool e cliente SQS.
-
-Etapa 4: WalletsController e TransactionsController são adapters finos; chamam os
-serviços de comandos/consultas e mapeadores, sem calcular saldo ou acessar EntityManager.
-DTOs são validados explicitamente, sem nova biblioteca: whitelist, campos obrigatórios,
-Money existente, referências e identificadores Unicode preserváveis em PostgreSQL.
-Header Idempotency-Key é obrigatório e único, nunca substituído por campo de body.
-
-FinancialQueryService usa as mesmas portas/UoW em snapshot somente leitura. Ledger tem
-keyset crescente por versão e limite superior fixado na primeira página; cursor Base64URL
-é versionado, vinculado à wallet e portátil entre instâncias. Não é token de autorização
-nem possui assinatura criptográfica. Ledger imutável permite percurso estável sem OFFSET.
-
-O filtro global distingue 400/404/409 de indisponibilidade 503, sem expor erros de driver.
-Respostas financeiras usam 200 PROCESSED, 202 pendente, 422 REJECTED ou 500 FAILED persistido.
-Replay terminal usa exclusivamente o resultado persistido; status HTTP é derivado dele,
-sem necessidade de outro snapshot HTTP ou alteração de schema. O body histórico é estável,
-exceto idempotentReplay; correlation/request IDs pertencem à nova requisição.
-
-Request ID é gerado por request; logs incluem IDs financeiros validados, duração e status,
-sem chave/hash/payload completo. HttpMetrics mantém somente contadores de observabilidade
-por processo, incluindo inconsistências de reconciliação, sem uso em integridade financeira.
-Não foi adicionado exporter, novo endpoint de métricas ou infraestrutura de monitoramento.
-Os contratos completos e seus limites estão em [docs/HTTP_API.md](docs/HTTP_API.md).
-
-Etapa 5: contadores por processo cobrem mensagens, duplicatas, falhas transitórias,
-DLQ, publicações, duração acumulada e quantidade de operações; gauges mostram pendências,
-eventos esgotados e idade do evento mais antigo. Snapshots JSON são emitidos a cada 10s.
-Não há exporter/agregador externo ou medição de SLO.
-
-## Infraestrutura implementada
-
-Compose principal: PostgreSQL persistente, LocalStack, jobs one-shot de bootstrap/migrate/queues
-e aplicação. Sem Docker socket montado no LocalStack: SQS não precisa dele.
-
-Aplicação sem host port fixa por padrão. `--scale app=3` atribui portas dinâmicas,
-sem `container_name`. Todos os processos compartilharão código e PostgreSQL;
-entrypoints separados de consumer/publisher foram adicionados na Etapa 5 autorizada.
-
-Compose de teste separado: sem portas/volumes compartilhados, projeto aleatório,
-PostgreSQL descartável e banco adicional aleatório criado para up/down/up.
-Não remove bancos ou volumes de desenvolvimento.
-
-## Concorrência implementada — Etapa 3
-
-Pessimistic locking por wallet, READ COMMITTED, transação curta e sem chamadas de rede.
-Repositório usa `LockMode.PESSIMISTIC_WRITE` dentro de transação ativa.
-Ordem: wallet → transação atual → validação da referência. Worker não pode manter
-lock da transação enquanto aguarda wallet. Retry limitado para deadlock e falhas retryable.
-Wallets distintas avançam em paralelo; nenhuma garantia depende de mutex do processo.
-
-`PostgresFinancialUnitOfWork` cria fork/transação por chamada. SQL manual usa
-`EntityManager.execute`, que encaminha o contexto transacional. Wallet é atualizada
-antes da conclusão da transação e inserção do ledger. A Promise só resolve após o commit
-e os triggers diferidos. Deadlock/serialização têm no máximo três tentativas inteiras;
-timeout vira PERSISTENCE_UNAVAILABLE, sem rejeição financeira. Uma resposta perdida após
-commit deve ser recuperada repetindo a mesma identidade.
-
-## Idempotência persistente implementada — Etapa 3
-
-Chave global e UNIQUE(provider_id,external_transaction_id); hash SHA-256 v1 calculado
-pela Application sobre array canônico aprovado. Não se aceita hash do cliente. Consulta
-antes e depois do lock; INSERT ON CONFLICT DO NOTHING com reconsulta em novo statement
-resolve disputas entre wallets distintas sem continuar uma transação abortada.
-
-Mesma chave/identidade/hash retorna o registro existente. Divergência ou identidades
-cruzadas produzem IDEMPOTENCY_CONFLICT. Replay terminal e primeira resposta usam o snapshot
-persistido, sem reconstruí-lo a partir do saldo atual. Replay de PENDING ou PENDING_REFERENCE
-devolve a pendência, sem executar transição. O contrato HTTP da Etapa 4 está documentado
-em docs/HTTP_API.md. Os testes de retomada usam somente harness interno, sem worker.
-
-A exclusão conjunta de REFUND/ROLLBACK diretos recebeu aprovação explícita após revisão.
-É uma restrição adicional ao item 7.4 do enunciado (unicidade por tipo), adotada para
-impedir dupla compensação. ROLLBACK de REFUND continua permitido e não reabre a BET.
-
-## Inbox/outbox — Etapa 5
-
-As cinco tabelas financeiras permanecem. A migration nova `20261029000100` concede
-INSERT e UPDATE apenas nas colunas operacionais de inbox/outbox, preservando as
-restrições do ledger, identidades, snapshots e roles. Acrescenta `position` identity
-na outbox, índice por aggregate/position e `last_error_code`. O trigger passa a aceitar
-`WagerTransactionPendingReference` enquanto a transação está em PENDING_REFERENCE.
-O down recusa registros de mensageria; não apaga eventos/diagnósticos para facilitar rollback.
-
-FinancialSession agora contém repositories inbox/outbox ligados ao mesmo EntityManager.
-FinancialService continua sendo o único processador usado pela API e pelo consumer.
-Inbox é adquirido por `(consumerName,messageId)` antes dos locks financeiros; hash
-incompatível é conflito. Novas operações criam eventos; replay não cria outro evento.
-Inbox, transação, saldo, ledger e eventos têm um único commit. Commit incerto é
-consultado em snapshot somente leitura antes de decidir por redelivery.
-
-Outbox usa `FOR UPDATE SKIP LOCKED`, owner por processo, lease e fencing por owner/attempt.
-Somente o evento não publicado mais antigo de cada wallet é elegível. Isso mantém
-sequência entre publishers sem serializar wallets distintas. A sequência identity pode
-ter lacunas por rollback; não é um contador financeiro. Publicação ocorre depois do commit
-do claim, sem transação aberta durante a chamada SQS. Marcação exige confirmação de envio
-e claim ainda vigente. Crash após envio permite republicação com o mesmo eventId.
-O limite de tentativas deixa eventos esgotados duráveis e visíveis em métricas; bloqueia
-a sequência daquela wallet até intervenção operacional. Não há descarte automático.
-
-Consumer usa um receive por loop, com múltiplos loops configuráveis e grupos derivados
-de walletId. Isso evita receber um batch da mesma wallet e ultrapassar uma mensagem que
-falhou. Heartbeat renova visibilidade durante o processamento. Long polling tem timeout
-de rede maior que a espera SQS; retries de mensagem são limitados, com backoff e jitter.
-Mensagens inválidas não entram no FinancialService. Esgotadas, são copiadas à DLQ com
-diagnóstico antes de remover a origem; redrive nativo cobre quedas antes dessa operação.
-Rejeição de negócio confirmada recebe ACK, sem virar falha de infraestrutura.
-
-SIGTERM/SIGINT abortam polling e aguardam operações em andamento. O entrypoint limita
-drenagem por prazo; um processo morto recupera-se por rollback SQL, redelivery e leases.
-Nenhuma garantia financeira depende desses hooks. Subscribers externos devem deduplicar
-eventId persistentemente; o teste de projeção comprova esse padrão além da dedup do broker.
-
-## Identidade externa
-
-Não implementar usuários/senhas próprios. O ponto de extensão futuro é uma porta
-`ProviderIdentityPort` na Application, conectada a guard OIDC/JWKS na interface HTTP,
-com validação de identidade e autorização do provider. A porta ainda não é um arquivo
-vazio nem um guard que simula proteção. Health fica público. O canal SQS é interno,
-mas os campos de provedor continuarão sujeitos à validação de domínio.
-
-## Domínio implementado — Etapa 2
-
-Money, Wallet, WagerTransaction, FinancialPolicy e WalletLedgerEntry são imutáveis;
-transições retornam novas instâncias. IDs e instantes são fornecidos pelo chamador.
-O domínio não consulta infraestrutura nem produz publicações.
-
-Abertura zero tem versão 1 e ledger vazio; abertura positiva produz OPENING/CREDIT
-com versão 1. Reversões rejeitadas não consomem o direito de reversão. REFUND e
-ROLLBACK diretos da mesma BET são mutuamente exclusivos por política de segurança
-adicional documentada. ROLLBACK de REFUND permanece permitido com validação de saldo.
-
-Detalhes, matriz, códigos e contrato futuro de persistência/replay em
-[docs/DOMAIN.md](docs/DOMAIN.md).
-
-## Reconciliação e evidências — Etapa 3
-
-`FinancialService.reconcile` consulta wallet/ledger/transações em READ ONLY REPEATABLE READ.
-O diagnóstico puro reconstrói o saldo desde zero, considera OPENING e a exceção de abertura
-zero, confere versões, equações, contextos, timestamps e efeitos das transações. Retorna
-issues estruturadas, sem reparar saldo. Totais históricos usam bigint de centavos, podendo
-exceder a faixa de Money sem perder precisão; saída monetária e contagens são strings.
-
-Os cinco cenários A–E foram executados em PostgreSQL real, incluindo 50 duplicatas em
-três processos/pools independentes, com um débito. Há testes reais de deadlock/retry,
-timeout, snapshots concorrentes, permissões e falhas de integridade no commit.
-Resultados e limitações em [VALIDATION.md](VALIDATION.md).
-
-O [pacote de revisão](docs/stage-3/REVIEW.md) preserva a aprovação e o SQL original.
-A implementação não modifica o domínio da Etapa 2. A validação usa bancos descartáveis;
-o banco e os containers de desenvolvimento existentes não foram migrados/reiniciados.
-
-## Evidências HTTP e preparação para a Etapa 5
-
-Os E2E usam três processos Nest executando o JavaScript compilado, pools e conexões
-PostgreSQL independentes, sem mocks financeiros. Validam 50 duplicatas HTTP com um
-débito, disputa de saldo, chave global, reversões concorrentes, wallets independentes,
-paginação estável sob inserção e replay de 80.00 com saldo atual de 130.00.
-
-A unidade de trabalho passou a classificar falhas transitórias também em consultas.
-Falha não classificada após conclusão do trabalho pode representar commit incerto:
-retorna indisponibilidade e exige repetição da identidade, sem rejeição financeira ou
-retry automático dessa situação desconhecida. Constraints permanecem erro de integridade.
-
-Etapa 5 implementou inbox/outbox, grants específicos, consumer/publisher e retries/DLQ,
-com validação real de crashes e concorrência. A Etapa 6 implementou retomada de referências
-com deadline persistido, TTL e orçamento de tentativas. Autorização externa do provider
-permanece pendente. A garantia de transporte é at-least-once; a unicidade dos efeitos
-financeiros permanece fundamentada no PostgreSQL.
-
-## Scheduler de referências — Etapa 6
-
-FinancialService.resolveNextPendingReference é a entrada interna explícita. Submit e
-resolução compartilham evaluate/persistDecision e FinancialPolicy; nenhum segundo motor
-foi criado. Replays nunca chamam o scheduler. Estados terminais continuam imutáveis.
-
-O claim faz SELECT de wallet com EXISTS de pendência elegível e FOR UPDATE OF w SKIP LOCKED;
-o EXISTS é leitura MVCC, sem lock da linha de transação. Só depois trava uma transação
-pendente daquela wallet. Referência/histórico são consultas MVCC. Assim, wallet → transaction
-permanece a ordem; referência de outra wallet não introduz uma segunda aquisição de wallet.
-Scheduler não trava inbox; publisher não solicita wallet enquanto segura claim de outbox.
-
-Claim, decisão, reagendamento/conclusão e outbox são uma única transação SQL curta, sem
-rede SQS, polling ou espera por referência dentro dela. Não se acrescentou lease persistente:
-rollback libera o claim. Statement/lock timeouts e idle_in_transaction_session_timeout
-local protegem sessões abandonadas; o teste recupera mesmo com o processo antigo vivo.
-Outra instância consulta o status persistido e nunca reexecuta uma transação terminal.
-
-Migration 20261029000200 incorpora o DDL aprovado: reference_deadline_at, CHECK, trigger
-de imutabilidade, índice parcial e UPDATE restrito da coluna nova. Backfill de pendências
-legadas usa created_at + 24h, sem mudar status/saldo/ledger. Como o backfill dispara triggers
-diferidos, a migration executa SET CONSTRAINTS ALL IMMEDIATE antes do DDL seguinte e restaura
-ALL DEFERRED; não desativa proteções. É um ajuste de execução do DDL, sem mudança do schema
-aprovado. O down recusa remover deadlines já preenchidos. Writers antigos devem ser drenados
-antes do upgrade. Os SQLs propostos originais permanecem preservados em docs/stage-6/.
-
-Novas pendências recebem prazo fixo na primeira transição e next_attempt_at. Defaults:
-24h, 20 avaliações totais contando aceite inicial, base 1s/teto 300s com equal jitter,
-polling 1s e lote de 20 transações independentes. Configuração de TTL nova não estende
-prazos existentes. A resolução limpa next_attempt_at no mesmo UPDATE que terminaliza,
-como exige transactions_terminal_ck. Em cada retry ainda pendente, somente metadados mudam;
-o evento WagerTransactionPendingReference não é repetido. Ao concluir, Processed/Rejected
-e, se houver ledger, WalletBalanceChanged entram na outbox no mesmo commit.
-
-No deadline, REJECTED/REFERENCE_NOT_FOUND prevalece mesmo se a referência tiver chegado
-depois. Antes do prazo, a última avaliação pode concluir uma referência válida; se continuar
-ausente/pendente, rejeita por orçamento. Falha de infraestrutura faz rollback e não consome
-tentativa financeira. A correlação vem do primeiro evento de pendência na outbox; legado
-sem esse evento usa pending-<md5(transactionId)> como identificação determinística de fallback.
-
-ReferenceScheduler e o entrypoint pending-reference são processos separados. O scheduler
-depende de PostgreSQL e das migrations, sem acoplamento de disponibilidade ao SQS. Eventos
-ficam duráveis até o publisher recuperar o broker. Logs incluem referência, prazo, próxima
-tentativa, resultado confirmado, failure code e duração; métricas são locais ao processo.
-Não há contador inventado de leases recuperados: sem leases persistidos, o rollback não
-deixa um marcador distinguível de um claim nunca confirmado. A recuperação é demonstrada
-pelos testes de crash/sessão abandonada. A Etapa 7 não foi iniciada.
-
-## Validação distribuída e observabilidade — Etapa 7
-
-Plano autorizado em 29/10/2026. O ambiente adicional em
-`docker-compose.distributed-test.yml` usa três containers API, três consumers, dois
-publishers e três schedulers, com PostgreSQL/tmpfs e LocalStack exclusivos. O runner
-host controla SIGKILL/reinício sem montar Docker socket no teste e remove apenas o
-projeto aleatório gerado. Não altera o Compose principal, migrations ou política.
-
-Readiness agora consulta as cinco tabelas e as colunas operacionais essenciais, com
-LIMIT 0, além das filas. Namespace sozinho não representa schema financeiro pronto.
-Liveness permanece independente. Os probes dos workers no Compose de teste observam
-startup/heartbeat do processo de produção, via supervisor exclusivo de testes.
-
-FinancialMetrics pertence à infraestrutura e observa a UoW: status é contabilizado
-após commit, com comparação do status anterior sob a transação existente. Replay,
-reagendamento sem mudança de status e rollback não contam como novo efeito. OPENING
-não é incluído nos contadores de comandos externos. Retry/deadlock/lock timeout e
-conflitos de idempotência têm contadores específicos. A observação não participa de
-qualquer decisão financeira nem tenta substituir a auditoria SQL. Commit incerto
-pode não ser contabilizado no processo que perdeu a resposta.
-
-APIs e workers emitem snapshots por processo a cada 10s. Publisher separa eventId do
-messageId SQS; logs incluem operação, resultado, código de erro estável e duração
-quando aplicáveis. application_name identifica a instância nas conexões PostgreSQL.
-Sem exporter/serviço novo, endpoint de falha ou flag de crash em produção. Injeções
-são adapters do harness usando o PostgreSQL real.
-
-Resultados, hashes de fonte, contagens e limites em
-[docs/stage-7/RESULT.md](docs/stage-7/RESULT.md). O parecer local não atualiza a
-implantação principal nem certifica capacidade de produção. Etapa 8 não iniciada.
+MikroORM usa EntitySchema e registros escalares. Os registros ORM não são entidades
+de domínio: mappers chamam factories rehydrate. Cada operação tem fork/identity map
+próprios, sem contexto global. InboxMessage/OutboxMessage são classes de domínio com
+factories, rehydrate, estado imutável e datas defensivas, usadas pelos repositories.
+Payloads são cópias JSON profundamente congeladas. Locks e proteção entre processos
+continuam no SQL; não foi criado outro protocolo de mensageria.
+
+## Stack e representação financeira
+
+Bun 1.4.4, TypeScript strict, NestJS 11.2.8, MikroORM 6.6.17, PostgreSQL 17.11,
+LocalStack 4.12.0 e AWS SDK SQS v3. decimal.js 10.6.0 usa configuração privada, precisão
+64 e representação string. Valores externos têm duas casas; não há arredondamento
+implícito, expoente, number monetário, NaN ou Infinity. A escala do exercício é dois
+para todas as moedas; o modelo preserva moeda e recusa incompatibilidades.
+
+NUMERIC sem typmod evita arredondamento antes do CHECK. O domain SQL protege
+não-negatividade, finitude, escala <=2 e limite de 18 inteiros/2 decimais. Mappers
+serializam duas casas. Versões usam bigint/string; totais de reconciliação podem
+exceder a faixa de uma wallet e usam bigint de centavos. Number é reservado a
+contadores, timestamps, paginação, latência e parâmetros operacionais.
+
+Factories/constructors privados encapsulam Money, Wallet, transações e ledger.
+Transições retornam novas instâncias; datas são copiadas e snapshots são congelados.
+Rehydrate reconstrói estado estrutural sem reaplicar débito/crédito ou transições.
+
+## Unidade transacional e concorrência
+
+FinancialService é o único processador financeiro para API e consumer. O scheduler
+usa resolveNextPendingReference, que reaproveita evaluate/persistDecision e a mesma
+FinancialPolicy. Não há segundo motor de saldo.
+
+Uma chamada UoW.write usa READ COMMITTED e transação MikroORM. A ordem é inbox,
+quando presente, → wallet → transação atual. O lock pessimista da wallet é a unidade
+de concorrência. Referências/históricos são lidos por MVCC; examinar referência de
+outra wallet não adquire o lock dela. Nenhuma chamada SQS ocorre sob esse lock.
+
+```mermaid
+sequenceDiagram
+  participant I as HTTP / Consumer
+  participant F as FinancialService
+  participant DB as PostgreSQL
+  participant P as Publisher
+  participant S as SQS
+  I->>F: submit(command, context)
+  F->>DB: BEGIN + inbox (se SQS)
+  F->>DB: identidade / lock wallet / reconsulta
+  F->>F: FinancialPolicy.process
+  F->>DB: wallet + transação + ledger + outbox + inbox
+  F->>DB: COMMIT e constraints diferidas
+  DB-->>F: confirmado
+  F-->>I: resultado persistido
+  Note over I,S: Consumer só executa DeleteMessage após confirmação
+  P->>DB: claim com lease (commit próprio)
+  P->>S: SendMessage com eventId estável
+  S-->>P: confirmação
+  P->>DB: marcar publicado com fencing
+```
+
+Deadlock/serialização 40P01/40001 repetem a UoW inteira, no máximo três tentativas,
+com novo fork e reconsulta. Lock/statement timeout e indisponibilidade retornam
+PERSISTENCE_UNAVAILABLE, não rejeição financeira. Erro não classificado após trabalho
+concluído pode ser commit incerto: sem compensação ou retry automático. A identidade
+persistida/inbox é consultada antes de repetir. Wallets independentes não compartilham
+um mutex global. O advisory lock do bootstrap protege somente provisionamento de roles.
+
+## Schema, ledger e papéis de acesso
+
+Quatro migrations versionadas: namespace; modelo financeiro; permissões/diagnóstico
+inbox/outbox; deadline/índice de referências. Não há schema synchronization, DDL ou
+migration no startup da aplicação. Jobs separados executam bootstrap administrativo
+e migration antes de app/workers. A reversão exige banco de teste e opt-in, usa
+RESTRICT e recusa remover histórico preenchido. Up/down/up é testado em banco vazio.
+
+wagering_owner e wagering_runtime são grupos NOLOGIN com logins distintos. Runtime
+não pode ser superuser, owner ou membro de papéis administrativos; a UoW verifica o
+papel efetivo. Seus grants permitem apenas operações necessárias, sem DELETE,
+TRUNCATE, DDL, alteração de ledger ou acesso ao histórico de migrations.
+
+CHECKs, índices únicos, FKs, triggers imediatos e diferidos garantem:
+
+- wallet única por player/moeda, saldo não negativo e versão coerente;
+- chave global e identidade externa únicas;
+- identidade e estados terminais imutáveis;
+- ledger append-only, direção/equação e sequência por versão;
+- correspondência entre saldo, snapshot e ledger no commit;
+- ausência de lançamento para LOSS, rejeição ou transação sem movimento;
+- identidade e estados finais de inbox/outbox protegidos.
+
+Abertura positiva cria OPENING/CREDIT na versão 1 no mesmo commit. Abertura zero não
+cria transação/ledger, mantém versão 1 e o primeiro movimento passa à versão 2.
+REJECTED/LOSS não alteram saldo/versão. Um administrador que pode alterar DDL/triggers
+não é coberto por uma promessa de proteção contra administrador malicioso.
+
+## Reversões e compatibilidade
+
+REFUND exige BET; ROLLBACK aceita BET, WIN ou REFUND. Provider, player, wallet, moeda,
+rodada e valor integral devem coincidir. Reversão que debitaria sem saldo é rejeitada
+com REVERSAL_INSUFFICIENT_FUNDS. REFUND/ROLLBACK ausentes podem aguardar referência.
+
+A política atualmente aprovada internamente consome uma referência ao processar
+qualquer REFUND ou ROLLBACK direto; o índice transactions_one_reversal_uq considera
+somente reference_transaction_id. Isso preserva a unicidade por tipo, mas rejeita
+uma segunda reversão de tipo diferente. Não se apresenta essa exclusão conjunta como
+uma exigência literal inequívoca do item 7.4. A manutenção da interpretação foi
+aprovada na Etapa 8.1: a restrição implica unicidade por tipo e previne dupla
+compensação. O avaliador continua informado sobre a restrição adicional; não se
+presume aceite externo. Domínio financeiro e constraints foram preservados.
+
+ROLLBACK de REFUND debita o crédito do reembolso, quando há saldo, e não restaura o
+direito de reverter diretamente a BET. Rejeições/falhas não consomem esse direito.
+PENDING_REFERENCE expirada é REJECTED/REFERENCE_NOT_FOUND, nunca FAILED por TTL.
+FAILED é terminal modelado, persistível e consultável; não existe conversão automática
+de toda falha permanente de mensagem em transação financeira FAILED.
+
+## Idempotência e replay
+
+Hash v1: SHA-256 UTF-8 do JSON do array
+`[1, providerId, externalTransactionId, walletId, playerId, currency, roundId, gameId, kind, amount, referenceOuNull]`.
+A ordem é fixa e os valores monetários são canônicos. O cliente não fornece o hash.
+Chave, correlationId, timestamps e envelope de transporte não entram no hash financeiro.
+
+Consulta de identidade antes/depois do lock, UNIQUE global/externo e INSERT ON
+CONFLICT DO NOTHING com reconsulta resolvem disputas inclusive entre wallets. A
+chave não vira alias: mesma identidade com outra chave é conflito. Replay pendente
+não executa transição; terminal retorna o snapshot original de saldo, versão e
+instante, sem consultar saldo atual. HTTP deriva código/body do snapshot, alterando
+apenas idempotentReplay e headers de tracing da nova requisição.
+
+## Inbox, Outbox e SQS
+
+Inbox usa `(consumerName,messageId)` e hash canônico do envelope. Inbox, transação,
+wallet, ledger e eventos pertencem ao mesmo commit SQL. MessageGroupId é SHA-256 de
+walletId; IDs de deduplicação são estáveis. FIFO otimiza ordenação, mas a integridade
+continua no banco. Heartbeat renova visibilidade; um receive por loop evita ultrapassar
+uma mensagem falha dentro de batch da mesma carteira.
+
+Outbox armazena envelopes tipados/versionados de IntegrationEvent abstrata e subclasses
+Processed, Rejected, PendingReference e WalletBalanceChanged. LOSS emite Processed,
+sem BalanceChanged. Abertura zero não emite efeito financeiro. Replay não cria eventos.
+Não há backfill de eventos para operações anteriores à implementação de mensageria.
+
+Claim usa SKIP LOCKED, lease e fencing por owner/attempt. Só o evento pendente mais
+antigo da wallet é elegível; wallets diferentes podem publicar em paralelo. O envio
+acontece fora da transação do claim. Falha depois do envio permite republicar o mesmo
+eventId. Subscriber precisa de deduplicação persistente; a suíte inclui uma projeção
+SQL de teste, não um subscriber de produto implantado.
+
+Consumer confirma rejeições de negócio. Erros transitórios recebem retry limitado
+com backoff/jitter; inválidos/permanentes/esgotados seguem para DLQ após envio
+confirmado, com redrive nativo como fallback de crash. Falha no ACK de operação já
+confirmada não a transforma em rejeição financeira. Outbox esgotada permanece no
+banco e bloqueia a sequência local até intervenção explícita. Guia: docs/MESSAGING.md.
+
+## Scheduler e recuperação
+
+Deadline imutável, attempts e next_attempt_at são persistidos. O scheduler seleciona
+wallet com pendência elegível usando FOR UPDATE OF w SKIP LOCKED; só depois trava a
+transação. Claim, avaliação, reagendamento/conclusão e eventos são um commit curto,
+sem rede ou espera de referência dentro da transação. Não há lease persistente extra:
+rollback libera o claim. Statement/lock/idle-in-transaction timeouts limitam sessões
+abandonadas.
+
+Defaults aprovados: TTL 24h, 20 avaliações totais incluindo aceite inicial, base 1s,
+teto 300s e equal jitter. Falha SQL não consome orçamento. Deadline vencido prevalece
+sobre referência tardia. Uma referência válida na última avaliação pode resolver.
+Após resolução, replay continua usando snapshot histórico. Ciclos são limitados por
+TTL/orçamento; não há detecção topológica. Upgrade de deadlines exige drenar writers
+antigos; backfill de created_at + 24h pode expirar pendências legadas.
+
+SIGTERM/SIGINT param polling e drenam trabalho dentro do prazo; SIGKILL dispensa hooks.
+A recuperação depende de rollback, identidades persistidas, redelivery e leases, não
+de graceful shutdown. Banco e broker reais são usados nos testes; fronteiras de crash
+exatas usam processos independentes e o restart conjunto usa 11 containers reais.
+
+## HTTP, saúde e observabilidade
+
+DTOs explícitos validam whitelist, formatos, Money e referências sem coerção. IDs
+Unicode preserváveis em PostgreSQL são aceitos; NUL/surrogates isolados são recusados.
+Ledger usa cursor Base64URL versionado/vinculado à wallet, keyset por versão e limite
+superior fixo. O cursor não é token de autorização ou assinatura criptográfica.
+
+Liveness não consulta dependências. Readiness valida PostgreSQL, tabelas/colunas
+operacionais e configuração das quatro filas. Ele não é auditoria completa de cada
+trigger/ACL; essa defesa pertence à UoW e aos testes de schema/permissões. Readiness
+503 não implica restart automático de container saudável. Workers principais não
+expõem HTTP; o Compose distribuído de teste usa supervisor para startup/heartbeat.
+
+Logs JSON incluem timestamp, nível, serviço, instanceId, operation e IDs/resultados
+aplicáveis, sem corpo/query/chave/hash/segredos. Publisher distingue eventId do ID do
+SQS. O filtro HTTP sanitiza erros e publica código estável. API/workers emitem métricas
+a cada 10s. FinancialMetrics conta transições externas observadas após commit, exclui
+OPENING/replay/rollback e observa conflitos/retries/locks. Polling vazio conta em commits,
+não em transações processadas. Métricas são voláteis por processo; resposta perdida
+pode deixar observação ausente. O ledger, não os contadores, é a fonte de auditoria.
+
+Reconciliação lê em READ ONLY REPEATABLE READ, reconstrói desde zero, verifica contexto,
+sequência, equações, direção, snapshots e efeito de cada transação. Divergências têm
+issues, log e métrica, sem reparo automático. Totais usam bigint de centavos.
+
+## Identidade externa e limite de confiança
+
+A decisão é não integrar IdP nesta entrega. O desenho futuro usa OIDC/JWKS e resolução
+de identidade do provedor antes dos controllers financeiros; health permanece público
+e SQS é interno, com validação de domínio. Não há usuários/senhas próprios.
+
+NoopProviderIdentityGuard é registrado em AppModule e aplicado aos controllers
+financeiros. canActivate permite acesso, sem autenticar ou inventar claims/provider.
+Health permanece sem guard. Essa é a extensão explícita exigida na opção sem IdP,
+não uma proteção ativa. O teste de composição substitui a implementação pelo modo
+de negação e confere todas as rotas financeiras bloqueadas, mantendo health público.
+
+## Ambiente e trade-offs
+
+Compose principal: volume PostgreSQL persistente, LocalStack local, jobs de acesso/
+migration/filas e processos separados. Aplicação final roda como bun, com bind de
+host somente loopback. O ambiente principal existente não foi atualizado pelos testes.
+Composes de teste usam projetos privados, PostgreSQL tmpfs, nenhuma porta ou volume
+principal. Instalação limpa de dependências usa frozen lockfile em Docker; no host
+não houve instalação/atualização de ferramentas.
+
+Sem Redis, broker adicional, exporter/dashboard, IdP, double-entry ou abstrações
+vazias introduzidas por preferência. Duplicações pequenas de validação HTTP/envelope
+pertencem a contratos de transporte diferentes e reutilizam o domínio para invariantes.
+As dependências diretas têm uso em fonte/build ou são peers exigidos pelo framework.
+Após aprovação explícita, overrides fixam Ajv 8.18.0 e Multer 2.5.0 sem mudar a major
+de Nest/MikroORM. Ajv passa a usar fast-uri em vez de uri-js/punycode; demais mudanças
+do lockfile se restringem a essa resolução transitiva. Atualizações dos pais devem
+reavaliar a necessidade dos overrides e repetir audit/testes.
+
+O resultado funcional da etapa 7 permanece histórico. A auditoria final compara
+novas execuções ao enunciado literal e não presume que testes da política interna
+provem todas as interpretações do contrato. Matrizes e evidências atuais estão em
+docs/stage-81. Os relatórios de stage-8 preservam a auditoria anterior à aprovação.
+
+## Integração das classes Inbox/Outbox — Etapa 8.1
+
+PostgresInboxRepository cria o estado por receive, reidrata registros persistidos e
+conclui por markProcessed. A conclusão usa o relógio PostgreSQL e a mesma transação
+financeira/lock de inbox, sem movimento fora da UoW. As portas/DTOs externos permanecem.
+
+PostgresOutboxRepository usa enqueue antes de gravar o evento. PostgresOutboxStore
+reidrata o estado do claim válido e usa markPublished/scheduleRetry para os parâmetros
+do UPDATE. O SELECT prévio é indicativo: o UPDATE mantém owner, attempts, publicação
+nula e lease válido como predicados autoritativos, inclusive se o claim mudar entre
+as duas consultas. Nenhum lock SQL é mantido durante chamada SQS.
+
+Tentativas continuam sendo incrementadas no claim durável, inclusive em crash. Por
+isso scheduleRetry não incrementa novamente. Backoff/jitter, ordem, limite e fencing
+permanecem no protocolo existente. As transições imutáveis protegem estado terminal,
+identidade, datas e payload; o banco continua sendo a garantia entre instâncias.

@@ -1,4 +1,10 @@
-# Relatório de implementação e validação — Etapas 1 e 2
+# Relatório de implementação e validação — execuções e histórico
+
+**Execução atual: remediação da Etapa 8.1, 29/10/2026**, registrada ao final deste
+documento e em [FINAL_REVIEW.md](FINAL_REVIEW.md). As seções anteriores são registros
+históricos das respectivas datas/etapas, não resultados atuais de uma nova execução.
+As pendências técnicas aprovadas foram tratadas; o parecer atual está em FINAL_REVIEW.
+Os resultados anteriores, inclusive o NÃO PRONTO da auditoria inicial, são históricos.
 
 Data: 28/10/2026, America/Sao_Paulo.
 
@@ -1215,3 +1221,155 @@ estão no mesmo diretório. Projetos de teste removidos sem down -v. Principal p
 sem upgrade de schema ou workers. A falha inicial de binding ANY(?) no harness foi
 corrigida para IN (?) e reexecutada; não foi contada como aprovação. Limites de commit,
 métricas por processo, LocalStack e capacidade de produção estão explícitos no relatório.
+
+## Etapa 8 — auditoria final, execução de 29/10/2026
+
+Parecer da entrega: **NÃO PRONTO**, por pendências P1 de conformidade, apesar de
+aprovação funcional. Auditoria/documentação concluídas sem nova política financeira,
+migration, grant, pacote atualizado, exclusão, commit ou publicação. Base Git ba6c997;
+fontes financeiras intactas. README/arquitetura/HTTP/domínio foram sincronizados e
+os runners receberam apenas --evidence-dir para preservar resultados históricos.
+
+### Ambiente e comandos atuais
+
+Windows/PowerShell, America/Sao_Paulo, Bun 1.4.4, TypeScript 5.9.3, NestJS 11.2.8,
+MikroORM 6.6.17, PostgreSQL 17.11-alpine, LocalStack 4.12.0, Docker 29.9.2 e Compose
+v5.6.1. Dependências diretas instaladas coincidem com package.json. Nenhuma ferramenta
+ou dependência foi instalada/atualizada no host.
+
+```text
+bun run test:build
+bun test test/unit
+bun run test:integration:docker
+bun run test:distributed:docker --evidence-dir docs/stage-8
+bun run test:load --evidence-dir docs/stage-8
+bun audit --json
+bun why ajv
+bun why multer
+docker build --no-cache --target test -t jungle-stage8-clean:test .
+docker compose config --quiet
+git diff --check
+```
+
+O Compose principal também foi construído/iniciado em projeto descartável separado,
+com override de portas/volume/banco/imagem. Comandos reproduzíveis e override em
+[docs/stage-8/AUDIT.md](docs/stage-8/AUDIT.md). Dados manuais não foram necessários.
+
+### Resultados da rodada final pós-ajuste
+
+| Suite/verificação | Resultado real |
+|---|---|
+| Build/typecheck/smoke | PASS; live 200, ready sem dependências 503; processo termina 143 |
+| Unitários | 176 PASS, 0 FAIL, 1.545 assertions |
+| Integração | 101 PASS, 0 FAIL, 1.304 assertions; 69,02s |
+| Total Bun | 277 PASS, 0 FAIL, 2.849 assertions |
+| Distribuído | 11 cenários + seed assertivo + recovery + carga: 14 verificações PASS |
+| Carga standalone | Repetição independente PASS, não somada como teste novo |
+| Instalação limpa | 234 pacotes com frozen lockfile, build/typecheck PASS sem cache da instalação |
+| Imagem final + Compose isolado | Três APIs live/ready 200, UID 1000; disputa 100/80/80 deixou 20.00 e reconciliação consistente |
+| Audit de dependências | FAIL, exit 1: Ajv 8.13.0 moderado e Multer 2.4.0 alto; sem fix automático |
+| Conformidade do enunciado | 46 PASS, 2 FAIL de inspeção; risco P1 de interpretação de reversão declarado |
+
+FAIL de inspeção não é falha de teste Bun: classes InboxMessage/OutboxMessage do
+esqueleto ausentes e ponto de extensão de identidade em código ausente. Garantias
+Inbox/Outbox SQL passaram. Unicidade por tipo é preservada, mas a proibição adicional
+entre REFUND/ROLLBACK requer decisão/aceite. Implementações estruturais/financeiras
+propostas não foram executadas. Não há teste funcional obrigatório BLOCKED nesta
+rodada. Failover, restore, produção AWS, perda física de disco, IdP e exploração dos
+advisories estão NOT_TESTED; não são usados como evidência de aprovação.
+
+### Evidências atuais
+
+- Integração: jungle-financial-test-ea0bef3d; resultados individuais em TESTS.txt.
+- Distribuído: jungle-distributed-test-3a1c3dc2. APIs 4c3eb193e338, 8e08bfde0c7e e
+  6044c692721b com backends 108/107/109. A–E, 50 duplicatas, FIFO, pendência e snapshots
+  após resolução/restart passaram; 11 containers com SIGKILL/exit 137 retomaram backlog.
+- Seis mensagens, seis pendências e 18 eventos foram preparados com os papéis parados;
+  12 operações recuperadas, sem nova compensação duplicada e com reconciliação.
+- Carga: 118 operações, 19 rejeições esperadas, zero erro operacional, 38 carteiras
+  reconciliadas e 171 eventos publicados; outbox final zero. HTTP p50/p95/p99:
+  553,52/696,33/771,81ms, throughput de transporte 44,74/s, sem meta de produção.
+- Carga independente: jungle-distributed-test-b8a726b2; mesmos invariantes, throughput
+  48,84/s e HTTP p50/p95/p99 667,91/856,19/876,70ms. Não é benchmark estatístico.
+- Imagem final/Compose: jungle-delivery-test-b51fbbe7; três APIs não root e smoke
+  financeiro; workers iniciados sem healthcheck no Compose principal. O runner
+  distribuído separado valida heartbeat e recuperação funcional desses papéis.
+- Logs distribuídos: 848 registros JSON, 83 entregas confirmadas e 289 publicações.
+  Contadores/retries/locks/outbox/pendências possuem testes e snapshots reais.
+
+Artefatos selecionados em docs/stage-8: TESTS.txt, clean-install.txt,
+distributed-evidence.json, load-evidence.json, delivery-smoke.json,
+security-audit.json, source-hashes.json, CONFORMANCE.md, REMEDIATION.md e CLEANUP.md.
+JSONs rastreados da Etapa 7 foram preservados. Logs brutos ficam ignorados. Os projetos
+de teste removeram somente seus containers/redes, sem down -v; principal preservado.
+
+### Parecer e riscos
+
+[FINAL_REVIEW.md](FINAL_REVIEW.md) contém a classificação justificada. Nenhum P0
+financeiro foi reproduzido, mas ponto de extensão de identidade, interpretação de
+reversões, diferença de modelagem e avisos transitivos impedem anunciar conformidade
+completa. O audit não encontrou configuração $data/upload/fileFilter vulnerável
+na aplicação; isso não equivale a prova universal de ausência de exploração. Nenhum
+segredo real conhecido foi identificado na configuração/três revisões alcançáveis.
+Nenhuma atualização automática foi feita para encobrir o resultado.
+
+## Etapa 8.1 — remediação aprovada, 29/10/2026
+
+Parecer atual: **PRONTO COM RESSALVAS para o desafio local**. As propostas foram
+aprovadas pelo usuário. NoopProviderIdentityGuard está ligado aos controllers
+financeiros; health fica público. InboxMessage/OutboxMessage são factories/estados
+imutáveis efetivamente usados pela persistência. Overrides fixam Ajv 8.18.0 e
+Multer 2.5.0; Nest/MikroORM permanecem nas versões anteriores. Audit retornou exit 0/{}.
+Foi aprovada a manutenção da exclusão conjunta de reversões: a restrição implica
+unicidade por tipo, e continua explicitada sem alegar aceite externo do avaliador.
+Não houve alteração de financial-policy.ts, migration, grants, .env ou Composes.
+
+| Execução final atual | Resultado |
+|---|---|
+| Build/typecheck/smoke | PASS; live 200, ready sem dependências 503; saída por sinal 143 |
+| Unitários | 183 PASS, 0 FAIL, 1.589 assertions em 14 arquivos |
+| Integração | 101 PASS, 0 FAIL, 1.304 assertions; 70,06s |
+| Total distinto | 284 PASS, 0 FAIL, 2.893 assertions |
+| Distribuído | 14 verificações PASS, incluindo seed/recovery/carga |
+| Instalação limpa runtime | Frozen lockfile sem cache, 233 pacotes build/221 produção, build PASS |
+| Imagem final | Três APIs UID 1000, live/ready 200, disputa 100/80/80 com saldo 20.00 e reconciliação consistente |
+| Audit | PASS, exit 0, zero advisories reportados no momento da consulta |
+| Rechecagem do startup | Duas repetições isoladas do cenário F passaram; não somadas ao total distinto |
+| Matriz do enunciado | 48 PASS, zero FAIL/BLOCKED após remediação |
+
+Evidências em docs/stage-81: TESTS.txt, distributed-evidence.json, delivery-smoke.json,
+security-audit.json, clean-install.txt, startup-recheck.json, source-hashes.json e
+CONFORMANCE.md. RESULT.md detalha arquivos, integração, decisões e limitações.
+
+Projetos finais: jungle-financial-test-24c8b476; jungle-distributed-test-d2cafd86;
+jungle-stage81-delivery-919a3ecc; jungle-stage81-startup-e6ca6b59. Os próprios
+containers/redes foram removidos sem down -v e sem atingir o principal.
+
+Carga embutida no runner: 118 operações (94 HTTP + 24 envios SQS), 19 rejeições
+esperadas, zero erro operacional, 38 carteiras reconciliadas, 171 eventos publicados,
+outbox final zero. Observados 40,98 operações de transporte/s e HTTP p50/p95/p99
+417,92/641,83/675,35ms. Não há inferência de capacidade de produção. O comando de
+carga standalone não foi repetido nesta etapa; o mesmo cenário integrado foi executado.
+SIGKILL nas fronteiras e nos 11 containers reais foi revalidado, com recuperação de
+seis mensagens, seis pendências e 18 eventos, sem dupla movimentação.
+
+Comandos: bun run test:build; bun test test/unit; bun run test:integration:docker;
+bun run test:distributed:docker --evidence-dir docs/stage-81; bun audit --json;
+docker build --no-cache --target runtime -t jungle-stage81-clean:runtime .
+A instalação no host foi limitada aos patches de dependências aprovados.
+
+Intercorrências preservadas em INITIAL-FAILURES.json: primeira integração com
+100 PASS/1 FAIL por processo encerrado antes do ready (causa não estabelecida),
+não reproduzido na regressão final e em duas repetições isoladas; primeira execução
+distribuída falhou na observação periódica do contador, embora cenários financeiros
+passassem. O runner agora observa a métrica antes do SIGKILL, com prazo, sem retirar
+assertivas. Falhas iniciais não foram contadas como aprovação. Um erro de tipagem
+de tupla do teste foi corrigido antes do build final. A rechecagem extra foi impedida
+uma vez por indisponibilidade da revisão automática/limite de uso; após retomada foi
+aprovada e executada, sem contorno de permissão.
+
+Ressalvas: guard é no-op; overrides ultrapassam ranges dos pais; interpretação de
+reversão permanece explícita; causa inicial do startup não foi confirmada; principal
+segue antigo; AWS real/IdP/HA/restore/perda de disco não testados. Não houve exclusão
+de artefatos, commit ou publicação. FINAL_REVIEW.md substitui o parecer antigo; o
+relatório anterior e as evidências das etapas 7/8 foram preservados como histórico.
